@@ -1,9 +1,4 @@
-export interface ExpertiseItem {
-    _id?: string;
-    title: string;
-    description: string;
-    image: string;
-}
+
 
 export interface ExpertiseFormData {
     _id?: string;
@@ -43,5 +38,4 @@ export interface DashboardStatsResponse {
 export interface DataStat {
     label: string;
     value: number;
-    color: string;
 }

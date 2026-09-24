@@ -8,9 +8,6 @@ import {
 import { toast } from "react-toastify";
 
 const Contact = () => {
-  const [projectTypes, setProjectTypes] = useState<string[]>([]);
-  const [budgets, setBudgets] = useState<string[]>([]);
-
   const [formData, setFormData] = useState({
     name: "",
     message: "",

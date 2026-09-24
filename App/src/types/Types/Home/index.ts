@@ -20,15 +20,6 @@ type SkillCardProps = {
   percentage: number | string;
 };
 
-type ExperienceItem = {
-  _id?: string;
-  year: string;
-  title: string;
-  duration?: string;
-  company: string;
-  description: string;
-};
-
 type SkillItem = {
   language: string;
   percentage: number | string;
@@ -43,10 +34,6 @@ type HeroProps = {
 
 type ServicesProps = Services;
 
-type ExperienceProps = {
-  data: ExperienceItem[];
-};
-
 type SkillsProps = {
   data: SkillItem[];
   resumeFile: ResumeFile;
@@ -56,11 +43,9 @@ export type {
   Hero,
   Services,
   SkillCardProps,
-  ExperienceItem,
   SkillItem,
   ResumeFile,
   HeroProps,
   ServicesProps,
-  ExperienceProps,
   SkillsProps,
 };
