@@ -50,3 +50,15 @@ export const ExperienceCacheKeys =
 
 export const NotificationCacheKeys =
     createCacheKeys("notification");
+
+export const ExpertiseCacheKeys =
+    createCacheKeys("expertise");
+
+export const HeroCacheKeys =
+    createCacheKeys("hero");
+
+export const HERO_ID =
+    "hero-id";
+
+export const NoteCacheKeys =
+    createCacheKeys("note");
