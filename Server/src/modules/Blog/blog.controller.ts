@@ -1,12 +1,27 @@
-import blogModel from './blog.model.ts';
-import { Get_Signed_Url, deleteFile, uploadFileToS3 } from '@utils';
-import type { Request, Response } from 'express';
-import type {
-  CreateBlogRequestBody,
-  UpdateBlogRequestBody,
-} from '@type';
+import blogModel from "./blog.model.ts";
+import {
+  Get_Signed_Url,
+  uploadFileToS3,
+  getUploadedFile,
+  getCache,
+  getCacheVersion,
+  incrementCacheVersion,
+  BlogCacheKeys
+} from "@utils";
+import type { Request, Response } from "express";
+import {
+  addBlogListCacheJob,
+  addBlogItemCacheJob,
+} from "./Blog.queue.ts";
 
-const toErrorMessage = (error: unknown): string => {
+import {
+  sendInfoNotification,
+  sendDangerNotification,
+} from "@modules/Notification/Notification.service.ts";
+
+const toErrorMessage = (
+  error: unknown
+): string => {
   if (error instanceof Error) {
     return error.message;
   }
@@ -14,26 +29,31 @@ const toErrorMessage = (error: unknown): string => {
   return String(error);
 };
 
-const getUploadedFile = (req: Request) => {
-  const files = req.files as
-    | {
-        file?: Express.Multer.File[];
-        image?: Express.Multer.File[];
-      }
-    | undefined;
-
-  return files?.image?.[0] ?? files?.file?.[0] ?? req.file ?? null;
-};
-
-const signBlogCoverImage = async <T extends { coverImage?: string }>(blog: T) => {
-  if (blog.coverImage && typeof blog.coverImage === 'string' && !blog.coverImage.startsWith('http')) {
+const signBlogCoverImage = async <
+  T extends { coverImage?: string }
+>(
+  blog: T
+) => {
+  if (
+    blog.coverImage &&
+    typeof blog.coverImage === "string" &&
+    !blog.coverImage.startsWith("http")
+  ) {
     try {
-      const signed = await Get_Signed_Url({ key: blog.coverImage });
-      if (signed?.url) {
-        return { ...blog, coverImage: signed.url };
-      }
+      const signedUrl =
+        await Get_Signed_Url({
+          key: blog.coverImage,
+        });
+
+      return {
+        ...blog,
+        coverImage: signedUrl,
+      };
     } catch (error) {
-      console.error('Failed to sign blog cover image', error);
+      console.error(
+        "Failed to sign blog cover image:",
+        error
+      );
     }
   }
 
@@ -41,160 +61,397 @@ const signBlogCoverImage = async <T extends { coverImage?: string }>(blog: T) =>
 };
 
 export const createBlog = async (
-  req: Request<Record<string, never>, unknown, CreateBlogRequestBody>,
-  res: Response,
+  req: Request,
+  res: Response
 ) => {
   try {
-    const { title, slug, excerpt, content, tags, isPublished } = req.body;
-    const file = getUploadedFile(req);
-
-    if (!title || !slug || !excerpt || !content) {
-      return res.status(400).json({ message: "Title, slug, excerpt, and content are required" });
-    }
-
-    if (!file) {
-      return res.status(400).json({ message: "Cover image file is required" });
-    }
-
-    // Upload image to S3 in Blog directory
-    const uploadedFile = await uploadFileToS3({
-      buffer: file.buffer,
-      fileName: file.originalname,
-      fileType: file.mimetype,
-      folderType: "Blog",
-    });
-
-    const blog = await blogModel.create({
+    const {
       title,
       slug,
       excerpt,
       content,
-      coverImage: uploadedFile.key, // Store the S3 key
       tags,
       isPublished,
-    });
-    res.status(201).json({ message: "Blog created successfully", blog });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error creating blog", error: toErrorMessage(error) });
-  }
-};
+    } = req.body;
 
-// Get all blogs
-export const getBlogs = async (_req: Request, res: Response) => {
-  try {
-    const blogs = await blogModel.find().sort({ createdAt: -1 });
-    const signedBlogs = await Promise.all(blogs.map((blog) => signBlogCoverImage(blog.toObject ? blog.toObject() : blog)));
-    res.status(200).json({ blog: signedBlogs });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error fetching blogs", error: toErrorMessage(error) });
-  }
-};
+    const file =
+      getUploadedFile(req);
 
-// Get a single blog by slug
-export const getBlogBySlug = async (
-  req: Request,
-  res: Response,
-) => {
-  try {
-    const { id } = req.params as { id: string };
-    const blog = await blogModel.findOne({ _id: id });
-    if (!blog) return res.status(404).json({ message: "Blog not found" });
-    const signedBlog = await signBlogCoverImage(blog.toObject ? blog.toObject() : blog);
-    res.status(200).json(signedBlog);
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error fetching blog", error: toErrorMessage(error) });
-  }
-};
+    if (!file) {
+      return res.status(400).json({
+        message:
+          "Cover image file is required",
+      });
+    }
 
-// Update a blog post
-export const updateBlog = async (
-  req: Request,
-  res: Response,
-) => {
-  try {
-    const { id } = req.params as { id: string };
-    const file = getUploadedFile(req);
-    const updateData = { ...req.body };
-
-    // If a new image is provided, upload it and use the S3 key
-    if (file) {
-      const uploadedFile = await uploadFileToS3({
+    const uploadedFile =
+      await uploadFileToS3({
         buffer: file.buffer,
         fileName: file.originalname,
         fileType: file.mimetype,
         folderType: "Blog",
       });
-      updateData.coverImage = uploadedFile.key;
 
-      // Delete old image if it exists
-      const oldBlog = await blogModel.findOne({ _id: id });
-      if (oldBlog?.coverImage) {
-        try {
-          await deleteFile(oldBlog.coverImage);
-        } catch (error) {
-          console.error("Error deleting old blog cover image:", error);
-        }
-      }
-    }
+    const blog =
+      await blogModel.create({
+        title,
+        slug,
+        excerpt,
+        content,
+        coverImage:
+          uploadedFile.key,
+        tags: tags || [],
+        isPublished:
+          isPublished ?? false,
+      });
 
-    const updatedBlog = await blogModel.findOneAndUpdate(
-      { _id: id },
-      updateData,
-      { new: true }
+    const version =
+      await incrementCacheVersion(
+        BlogCacheKeys.listVersion()
+      );
+
+    await addBlogListCacheJob(
+      version,
+      1,
+      10
     );
 
-    if (!updatedBlog) {
-      return res.status(404).json({ message: "Blog not found" });
-    }
+    await sendInfoNotification(
+      "Blog Created",
+      `Blog "${title}" was created successfully.`
+    );
 
-    res.status(200).json({
-      message: "Blog updated successfully",
-      updatedBlog,
+    return res.status(201).json({
+      message:
+        "Blog created successfully",
+      blog,
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Error updating blog",
+    await sendDangerNotification(
+      "Blog Creation Failed",
+      "Failed to create blog."
+    );
+
+    return res.status(500).json({
+      message: "Error creating blog",
       error: toErrorMessage(error),
     });
   }
 };
 
-// Delete a blog post
-export const deleteBlog = async (
+export const getBlogs = async (
   req: Request,
-  res: Response,
+  res: Response
 ) => {
   try {
-    const { id } = req.params as { id: string };
-    const codefile = await blogModel.findOne({ _id: id });
+    const page =
+      Math.max(
+        Number(req.query.page) || 1,
+        1
+      );
 
-    if (!codefile) {
-      return res.status(404).json({ message: "Blog not found" });
+    const limit =
+      Math.min(
+        Math.max(
+          Number(req.query.limit) || 10,
+          1
+        ),
+        100
+      );
+
+    const version =
+      await getCacheVersion(
+        BlogCacheKeys.listVersion()
+      );
+
+    const cacheKey =
+      BlogCacheKeys.list(
+        version,
+        page,
+        limit
+      );
+
+    const cachedBlogs =
+      await getCache(cacheKey);
+
+    if (cachedBlogs) {
+      return res.status(200).json({
+        blog: cachedBlogs,
+      });
     }
 
-    try {
-      if (codefile.coverImage) {
-        await deleteFile(codefile.coverImage);
-      }
-    } catch (error) {
-      console.error(error);
-    }
+    const skip =
+      (page - 1) * limit;
 
-    const deletedBlog = await blogModel.findOneAndDelete({
-      _id: id,
+    const blogs =
+      await blogModel
+        .find()
+        .sort({
+          createdAt: -1,
+        })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+    const signedBlogs =
+      await Promise.all(
+        blogs.map((blog) =>
+          signBlogCoverImage(blog)
+        )
+      );
+
+    await addBlogListCacheJob(
+      version,
+      page,
+      limit
+    );
+
+    return res.status(200).json({
+      blog: signedBlogs,
     });
-    if (!deletedBlog)
-      return res.status(404).json({ message: "Blog not found" });
-    res.status(200).json({ message: "Blog deleted successfully" });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error deleting blog", error: toErrorMessage(error) });
+    return res.status(500).json({
+      message:
+        "Error fetching blogs",
+      error: toErrorMessage(error),
+    });
+  }
+};
+
+export const getBlogBySlug = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { id } =
+      req.params as {
+        id: string;
+      };
+
+    const version =
+      await getCacheVersion(
+        BlogCacheKeys.detailsVersion(id)
+      );
+
+    const cacheKey =
+      BlogCacheKeys.details(
+        id,
+        version
+      );
+
+    const cachedBlog =
+      await getCache(cacheKey);
+
+    if (cachedBlog) {
+      return res.status(200).json(
+        cachedBlog
+      );
+    }
+
+    const blog =
+      await blogModel
+        .findOne({
+          _id: id,
+        })
+        .lean();
+
+    if (!blog) {
+      return res.status(404).json({
+        message: "Blog not found",
+      });
+    }
+
+    const signedBlog =
+      await signBlogCoverImage(blog);
+
+    await addBlogItemCacheJob(
+      id,
+      version
+    );
+
+    return res.status(200).json(
+      signedBlog
+    );
+  } catch (error) {
+    return res.status(500).json({
+      message:
+        "Error fetching blog",
+      error: toErrorMessage(error),
+    });
+  }
+};
+
+export const updateBlog = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { id } =
+      req.params as {
+        id: string;
+      };
+
+    const file =
+      getUploadedFile(req);
+
+    const updateData = {
+      ...req.body,
+    };
+
+    const oldBlog =
+      await blogModel.findById(id);
+
+    if (!oldBlog) {
+      return res.status(404).json({
+        message: "Blog not found",
+      });
+    }
+
+    if (file) {
+      const uploadedFile =
+        await uploadFileToS3({
+          buffer: file.buffer,
+          fileName:
+            file.originalname,
+          fileType:
+            file.mimetype,
+          folderType: "Blog",
+        });
+
+      updateData.coverImage =
+        uploadedFile.key;
+    }
+
+    const updatedBlog =
+      await blogModel.findByIdAndUpdate(
+        id,
+        updateData,
+        {
+          new: true,
+          runValidators: true,
+        }
+      );
+
+    if (!updatedBlog) {
+      return res.status(404).json({
+        message: "Blog not found",
+      });
+    }
+
+    const listVersion =
+      await incrementCacheVersion(
+        BlogCacheKeys.listVersion()
+      );
+
+    const itemVersion =
+      await incrementCacheVersion(
+        BlogCacheKeys.detailsVersion(id)
+      );
+
+    await addBlogListCacheJob(
+      listVersion,
+      1,
+      10
+    );
+
+    await addBlogItemCacheJob(
+      id,
+      itemVersion
+    );
+
+    await sendInfoNotification(
+      "Blog Updated",
+      `Blog "${updatedBlog.title}" was updated successfully.`
+    );
+
+    const signedBlog =
+      await signBlogCoverImage(
+        updatedBlog.toObject()
+      );
+
+    return res.status(200).json({
+      message:
+        "Blog updated successfully",
+      updatedBlog: signedBlog,
+    });
+  } catch (error) {
+    await sendDangerNotification(
+      "Blog Update Failed",
+      "Failed to update blog."
+    );
+
+    return res.status(500).json({
+      message:
+        "Error updating blog",
+      error: toErrorMessage(error),
+    });
+  }
+};
+
+export const deleteBlog = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { id } =
+      req.params as {
+        id: string;
+      };
+
+    const blog =
+      await blogModel.findById(id);
+
+    if (!blog) {
+      return res.status(404).json({
+        message: "Blog not found",
+      });
+    }
+
+    const deletedBlog =
+      await blogModel.findByIdAndDelete(
+        id
+      );
+
+    if (!deletedBlog) {
+      return res.status(404).json({
+        message: "Blog not found",
+      });
+    }
+
+    const listVersion =
+      await incrementCacheVersion(
+        BlogCacheKeys.listVersion()
+      );
+
+    await incrementCacheVersion(
+      BlogCacheKeys.detailsVersion(id)
+    );
+
+    await addBlogListCacheJob(
+      listVersion,
+      1,
+      10
+    );
+
+    await sendInfoNotification(
+      "Blog Deleted",
+      `Blog "${deletedBlog.title}" was deleted successfully.`
+    );
+
+    return res.status(200).json({
+      message:
+        "Blog deleted successfully",
+    });
+  } catch (error) {
+    await sendDangerNotification(
+      "Blog Deletion Failed",
+      "Failed to delete blog."
+    );
+
+    return res.status(500).json({
+      message:
+        "Error deleting blog",
+      error: toErrorMessage(error),
+    });
   }
 };

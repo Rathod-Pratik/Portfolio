@@ -1,5 +1,5 @@
 import { AdminModel } from '../Auth/Admin.model.ts';
-import blogModel from '../Blog/blog.model.ts';
+import blogModel from '../Blog/Blog.model.ts';
 import { NoteModel } from '../Note/note.model.ts';
 import { Project } from '../Project/project.model.ts';
 import { contactModel } from '../Contact/contact.model.ts';
