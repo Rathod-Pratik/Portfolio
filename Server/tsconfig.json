@@ -4,11 +4,25 @@
     "target": "esnext",
     "baseUrl": ".",
     "paths": {
-      "@Middleware": ["Middleware/index.ts"],
-      "@Middleware/*": ["Middleware/*", "src/middlewares/*"],
-      "@utils":["src/utils/index.ts"],
-      "@type":["src/Type/index.ts"],
-      "@modules/*":["src/modules/*"],
+      "@Middleware": [
+        "Middleware/index.ts"
+      ],
+      "@Middleware/*": [
+        "Middleware/*",
+        "src/middlewares/*"
+      ],
+      "@utils": [
+        "src/utils/index.ts"
+      ],
+      "@type": [
+        "src/Type/index.ts"
+      ],
+      "@modules/*": [
+        "src/modules/*"
+      ],
+      "@config/*": [
+        "src/config/*"
+      ]
     },
     "types": [],
     "sourceMap": true,

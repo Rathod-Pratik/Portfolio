@@ -19,7 +19,7 @@ import StateRoutes from '@modules/Stats/States.routes.ts';
 import ExperienceRoutes from '@modules/Experience/experience.route.ts';
 import HeroRoutes from '@modules/Hero/hero.route.ts';
 import ExpertiseRoutes from '@modules/Expertice/expertise.route.ts';
-import AboutRoutes from '@modules/About/about.route.ts';
+import AboutRoutes from '@modules/About/About.routes.ts';
 import BudgetRoutes from '@modules/Budget/budget.route.ts';
 import ProjectTypeRoutes from '@modules/ProjectType/projectType.route.ts';
 
@@ -58,19 +58,19 @@ app.get("/", (req, res) => {
   res.status(200).send("Backend is up");
 });
 
-app.use("/contact", contactroutes); 
-app.use("/note", NoteRoutes); 
-app.use("/auth", AuthRoutes); 
-app.use("/CV", CVRoutes); 
-app.use("/s3", AwsRoutes); 
-app.use("/project", ProjectRoutes); 
-app.use("/skills", SkillsRoutes); 
-app.use("/blogs", BlogRoutes); 
-app.use("/states", StateRoutes); 
-app.use("/experiences", ExperienceRoutes);  
-app.use("/hero", HeroRoutes); 
-app.use("/expertise", ExpertiseRoutes); 
-app.use("/about", AboutRoutes); 
+app.use("/contact", contactroutes);
+app.use("/note", NoteRoutes);
+app.use("/auth", AuthRoutes);
+app.use("/CV", CVRoutes);
+app.use("/s3", AwsRoutes);
+app.use("/project", ProjectRoutes);
+app.use("/skills", SkillsRoutes);
+app.use("/blogs", BlogRoutes);
+app.use("/states", StateRoutes);
+app.use("/experiences", ExperienceRoutes);
+app.use("/hero", HeroRoutes);
+app.use("/expertise", ExpertiseRoutes);
+app.use("/about", AboutRoutes);
 app.use("/budget", BudgetRoutes);
 app.use("/project-type", ProjectTypeRoutes);
 

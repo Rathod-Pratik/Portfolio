@@ -1,5 +1,5 @@
 import mongoose, { type HydratedDocument } from "mongoose";
-import type { IAbout } from '@type';
+import type { IAbout } from './About.types.ts';
 
 const aboutSchema = new mongoose.Schema<IAbout>(
   {

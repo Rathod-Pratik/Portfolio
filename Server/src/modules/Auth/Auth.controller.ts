@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { randomInt } from "node:crypto";
 import { sendForgotPasswordOtpEmail, sendLoginOtpEmail } from '@utils';
-import type { CookieOptions, Response,Request } from 'express';
+import type { CookieOptions, Response, Request } from 'express';
 import type {
   ForgotPasswordRequestBody,
   JwtTokenPayload,
@@ -24,47 +24,68 @@ const toErrorMessage = (error: unknown): string => {
   return String(error);
 };
 
-export const Login = async (req: TypedRequest<LoginRequestBody>, res:Response) => {
+export const Login = async (
+  req: TypedRequest<LoginRequestBody>,
+  res: Response
+) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: "Please fill all the fields" });
+      return res.status(400).json({
+        error: "Please fill all the fields",
+      });
     }
 
-    const normalizedEmail = email.toLowerCase();
-    const user = await AdminModel.findOne({ email: normalizedEmail });
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await AdminModel.findOne({
+      email: normalizedEmail,
+    });
 
     if (!user) {
-      return res.status(400).json({ error: "Account not found" });
+      return res.status(400).json({
+        error: "Account not found",
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
+
     if (!isMatch) {
-      return res.status(400).json({ error: "Please enter valid Password" });
+      return res.status(400).json({
+        error: "Please enter valid Password",
+      });
     }
 
-    const otp = String(randomInt(100000, 1000000));
-    const otpHash = await bcrypt.hash(otp, 10);
-    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-    user.loginOtpHash = otpHash;
-    user.loginOtpExpiresAt = otpExpiresAt;
-    await user.save();
-
-    await sendLoginOtpEmail({ to: normalizedEmail, otp });
+    const token = jwt.sign(
+      {
+        id: user._id,
+        email: user.email,
+      },
+      process.env.JWT_SECRET as string,
+      {
+        expiresIn: "1d",
+      }
+    );
 
     return res.status(200).json({
-      message: "OTP sent successfully",
-      email: normalizedEmail,
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+      },
     });
   } catch (error) {
     console.error("Error during login:", toErrorMessage(error));
-    return res.status(500).json({ error: "Internal Server Error" });
+
+    return res.status(500).json({
+      error: "Internal Server Error",
+    });
   }
 };
 
-export const verifyLoginOtp = async (req: TypedRequest<VerifyLoginOtpRequestBody>, res:Response) => {
+export const verifyLoginOtp = async (req: TypedRequest<VerifyLoginOtpRequestBody>, res: Response) => {
   try {
     const { email, otp } = req.body;
 
@@ -125,7 +146,7 @@ export const verifyLoginOtp = async (req: TypedRequest<VerifyLoginOtpRequestBody
 };
 
 
-export const signup = async (req: TypedRequest<SignupRequestBody>, res:Response) => {
+export const signup = async (req: TypedRequest<SignupRequestBody>, res: Response) => {
   try {
     const { email, password, name } = req.body;
 
@@ -156,13 +177,13 @@ export const signup = async (req: TypedRequest<SignupRequestBody>, res:Response)
   }
 };
 
-export const Logout = async (req:Request, res:Response) => {
+export const Logout = async (req: Request, res: Response) => {
   try {
     console.log("Cookies:", req.cookies);
     res.clearCookie("admin", {
       httpOnly: true,
-      secure: true, 
-      sameSite: "none", 
+      secure: true,
+      sameSite: "none",
     });
 
     return res.status(200).json({ message: "Logged out successfully" });
@@ -171,7 +192,7 @@ export const Logout = async (req:Request, res:Response) => {
   }
 };
 
-export const forgotPassword = async (req: TypedRequest<ForgotPasswordRequestBody>, res:Response) => {
+export const forgotPassword = async (req: TypedRequest<ForgotPasswordRequestBody>, res: Response) => {
   try {
     const { email } = req.body;
 
@@ -207,7 +228,7 @@ export const forgotPassword = async (req: TypedRequest<ForgotPasswordRequestBody
   }
 };
 
-export const verifyOtp = async (req: TypedRequest<VerifyOtpRequestBody>, res:Response) => {
+export const verifyOtp = async (req: TypedRequest<VerifyOtpRequestBody>, res: Response) => {
   try {
     const { email, otp } = req.body;
 
@@ -245,7 +266,7 @@ export const verifyOtp = async (req: TypedRequest<VerifyOtpRequestBody>, res:Res
   }
 };
 
-export const resetPassword = async (req: TypedRequest<ResetPasswordRequestBody>, res:Response) => {
+export const resetPassword = async (req: TypedRequest<ResetPasswordRequestBody>, res: Response) => {
   try {
     const { email, password } = req.body;
 

@@ -1,0 +1,49 @@
+export const createCacheKeys = (module: string) => {
+
+    return {
+
+        listVersion: () =>
+            `${module}:list:version`,
+
+        list: (
+            version: number,
+            page: number,
+            limit: number,
+            id?: string
+        ) =>
+            `${module}:list:${version}:${id || 'all'}:page:${page}:limit:${limit}`,
+
+        detailsVersion: (
+            id: string
+        ) =>
+            `${module}:details:version:${id}`,
+
+        details: (
+            id: string,
+            version: number
+        ) =>
+            `${module}:details:${version}:${id}`,
+    };
+};
+
+
+export const BlogCacheKeys =
+    createCacheKeys("blog");
+
+export const AboutCacheKeys =
+    createCacheKeys("about");
+
+export const AuthCacheKeys =
+    createCacheKeys("auth");
+
+export const ContactCacheKeys =
+    createCacheKeys("contact");
+
+export const OtpCacheKeys =
+    createCacheKeys("otp");
+
+export const ContentCacheKeys =
+    createCacheKeys("content");
+
+export const NotificationCacheKeys =
+    createCacheKeys("notification");

@@ -1,4 +1,3 @@
-export * from './Types/About/index.ts';
 export * from './Types/Auth/index.ts';
 export * from './Types/Aws/index.ts';
 export * from './Types/Blog/index.ts';
