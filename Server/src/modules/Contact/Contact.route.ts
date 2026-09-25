@@ -5,8 +5,8 @@ import {
     GetContact,
     UpdateContactStatus,
 } from "./contact.controller.ts";
-import { checkAdminCookie } from "../../middlewares/Auth.middleware.ts";
-import { updateAdminViews } from "../../middlewares/View.middleware.ts";
+import { checkAdminCookie } from "@Middleware/Auth.middleware.ts";
+import { updateAdminViews } from "@Middleware/View.middleware.ts";
 import { Validate } from "@Middleware/Validation.middleware.ts";
 import {
     CreateContactSchema,

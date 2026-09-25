@@ -45,5 +45,8 @@ export const OtpCacheKeys =
 export const ContentCacheKeys =
     createCacheKeys("content");
 
+export const ExperienceCacheKeys =
+    createCacheKeys("experience");
+
 export const NotificationCacheKeys =
     createCacheKeys("notification");
