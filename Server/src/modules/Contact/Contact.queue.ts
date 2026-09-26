@@ -1,13 +1,14 @@
 import { Queue } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
 
-export interface IContactCacheJob {
-    version: number;
-    page: number;
-    limit: number;
+export interface ICreateContactJob {
+    name: string;
+    email: string;
+    mobile: string;
+    message: string;
 }
 
-export const contactQueue = new Queue<IContactCacheJob>(
+export const contactQueue = new Queue<ICreateContactJob>(
     'contact',
     {
         connection: bellmqConnection,
@@ -23,17 +24,10 @@ export const contactQueue = new Queue<IContactCacheJob>(
     }
 );
 
-export const addContactCacheJob = async (
-    version: number,
-    page: number,
-    limit: number
+export const CreateContactJob = async (
+    item: ICreateContactJob
 ) => {
     return await contactQueue.add(
-        "cache-contact",
-        {
-            version,
-            page,
-            limit,
-        }
+        "cache-contact",item
     );
 };

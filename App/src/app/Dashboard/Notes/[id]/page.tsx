@@ -1,319 +1,457 @@
-import { useState, useEffect } from "react";
-import { toast } from "react-toastify";
-import { useNavigate, useLocation } from "react-router-dom";
-import { FiUpload, FiFileText, FiImage, FiTrash2 } from "react-icons/fi";
-import { useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@apiClient";
-import { CREATE_NOTES, EDIT_NOTES, DELETE_NOTES } from "@api";
-import type { NoteFormData, NoteItem } from "@Type";
+"use client";
 
-const emptyFormData: NoteFormData = {
-  _id: null,
-  title: "",
-  description: "",
-  imageFile: null,
-  note_image_url: "",
-  note_pdf_url: "",
-  pdfFile: null,
+import { use, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { toast } from "react-toastify";
+import type { AxiosError } from "axios";
+import { FiUpload, FiFileText, FiTrash2, FiFile } from "react-icons/fi";
+import * as yup from "yup";
+import { useFormik } from "formik";
+import { CREATE_NOTES, DELETE_NOTES, EDIT_NOTES, GET_NOTES } from "@api";
+import { apiClient } from "@apiClient";
+import { Button, Input, Loading } from "@components";
+import type { NoteItem } from "@Type";
+
+type PageProps = {
+  params: Promise<{
+    id: string;
+  }>;
 };
 
-const CreateNote = () => {
+const validationSchema = yup.object().shape({
+  title: yup
+    .string()
+    .trim()
+    .min(3, "Title must be at least 3 characters")
+    .max(150, "Title must not exceed 150 characters")
+    .required("Title is required"),
+  description: yup
+    .string()
+    .trim()
+    .min(10, "Description must be at least 10 characters")
+    .required("Description is required"),
+  image: yup
+    .mixed<File>()
+    .test("imageRequired", "Cover image is required", function (value) {
+      if (value instanceof File) return true;
+      if (this.parent.imageUrl) return true;
+      return false;
+    })
+    .test(
+      "fileType",
+      "Only JPG, JPEG, PNG, and WEBP images are allowed",
+      (value) => {
+        if (!value || !(value instanceof File)) return true;
+        return [
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/webp",
+        ].includes(value.type);
+      }
+    )
+    .test(
+      "fileSize",
+      "Image size must be less than 5 MB",
+      (value) => {
+        if (!value || !(value instanceof File)) return true;
+        return value.size <= 5 * 1024 * 1024;
+      }
+    ),
+  pdf: yup
+    .mixed<File>()
+    .test("pdfRequired", "PDF document is required", function (value) {
+      if (value instanceof File) return true;
+      if (this.parent.pdfUrl) return true;
+      return false;
+    })
+    .test(
+      "fileType",
+      "Only PDF files are allowed",
+      (value) => {
+        if (!value || !(value instanceof File)) return true;
+        return (
+          value.type === "application/pdf" ||
+          value.name.toLowerCase().endsWith(".pdf")
+        );
+      }
+    )
+    .test(
+      "fileSize",
+      "PDF size must be less than 25 MB",
+      (value) => {
+        if (!value || !(value instanceof File)) return true;
+        return value.size <= 25 * 1024 * 1024;
+      }
+    ),
+});
+
+const CreateNote = ({ params }: PageProps) => {
+  const router = useRouter();
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [loading, setLoading] = useState(false);
+  const resolvedParams = use(params);
+  const rawId = resolvedParams?.id;
+  const isEdit = Boolean(rawId && rawId !== "create" && rawId !== "new");
+  const id = isEdit ? rawId : null;
+
   const [isDeleting, setIsDeleting] = useState(false);
-  const [formData, setFormData] = useState<NoteFormData>(emptyFormData);
-  const [imagePreview, setImagePreview] = useState("");
 
-  const resolveImagePreview = async (value: string) => {
-    if (!value) {
-      setImagePreview("");
-      return;
-    }
-
-    if (value.startsWith("http://") || value.startsWith("https://")) {
-      setImagePreview(value);
-      return;
-    }
-
-    try {
-      const response = await apiClient.post<{ url: string }>("/s3/signed-get-url", {
-        key: value,
-      });
-      setImagePreview(response.data.url);
-    } catch (error) {
-      console.error("Failed to resolve note image preview", error);
-      setImagePreview("");
-    }
-  };
-
-  useEffect(() => {
-    if (location.state?.item) {
-      const item = location.state.item as NoteItem;
-      const existingImage = item.note_image_url || item.imageUrl || "";
-      setFormData({
-        _id: item._id || null,
-        title: item.title,
-        description: item.description,
-        imageFile: null,
-        note_image_url: existingImage,
-        note_pdf_url: item.note_pdf_url || item.fileUrl || "",
-        pdfFile: null,
-      });
-      resolveImagePreview(existingImage);
-    }
-  }, [location.state]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: "image" | "pdf") => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (type === "image") {
-      const previewUrl = URL.createObjectURL(file);
-      setFormData((prev) => ({
-        ...prev,
-        imageFile: file,
-        note_image_url: previewUrl,
-      }));
-      setImagePreview(previewUrl);
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        pdfFile: file,
-        note_pdf_url: file.name,
-      }));
-    }
-  };
-
-  const AddNotes = async () => {
-    try {
-      if (!formData.title) return toast.error("Title is required.");
-      if (!formData.pdfFile) return toast.error("PDF file is required.");
-      if (!formData.description) return toast.error("Description is required.");
-      if (!formData.imageFile) return toast.error("Image is required.");
-
-      setLoading(true);
-
-      const payload = new FormData();
-      payload.append("title", formData.title);
-      payload.append("description", formData.description || "");
-      payload.append("file", formData.pdfFile);
-      payload.append("image", formData.imageFile);
-
-      const response = await apiClient.post(CREATE_NOTES, payload, {
+  const {
+    data: noteData,
+    isLoading: isNoteLoading,
+    isError: isNoteError,
+  } = useQuery<NoteItem>({
+    queryKey: ["admin-note", id],
+    enabled: Boolean(isEdit && id),
+    queryFn: async () => {
+      const response = await apiClient.get(`${GET_NOTES}/${id}`, {
         withCredentials: true,
       });
-
-      if (response.status === 200 || response.status === 201) {
-        toast.success("Note added successfully.");
-        queryClient.invalidateQueries({ queryKey: ["notes"] });
-        navigate("/admin/notes");
+      const data =
+        response.data?.data ??
+        response.data?.note ??
+        response.data?.blog ??
+        response.data;
+      if (!data) {
+        throw new Error("Note not found");
       }
-    } catch (error: any) {
-      if (error.response && error.response.status === 403) {
-        toast.error("Access denied. Please login as admin.");
-        return navigate("/login");
+      return data;
+    },
+  });
+
+  const formik = useFormik({
+    enableReinitialize: true,
+    initialValues: {
+      title: noteData?.title || "",
+      description: noteData?.description || "",
+      image: undefined as File | undefined,
+      imageUrl: (noteData?.note_image_url || noteData?.imageUrl || "") as string,
+      pdf: undefined as File | undefined,
+      pdfUrl: (noteData?.note_pdf_url || noteData?.pdfUrl || noteData?.fileUrl || "") as string,
+    },
+    validationSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      try {
+        const payload = new FormData();
+        payload.append("title", values.title.trim());
+        payload.append("description", values.description.trim());
+
+        if (values.image instanceof File) {
+          payload.append("image", values.image);
+        }
+
+        if (values.pdf instanceof File) {
+          payload.append("file", values.pdf);
+        }
+
+        if (isEdit && id) {
+          payload.append("_id", id);
+          const response = await apiClient.put(EDIT_NOTES, payload, {
+            withCredentials: true,
+          });
+
+          if (response.status === 200 || response.status === 201) {
+            toast.success("Note updated successfully.");
+            queryClient.invalidateQueries({ queryKey: ["notes"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-note", id] });
+            router.push("/Dashboard/Notes");
+          }
+        } else {
+          const response = await apiClient.post(CREATE_NOTES, payload, {
+            withCredentials: true,
+          });
+
+          if (response.status === 200 || response.status === 201) {
+            toast.success("Note added successfully.");
+            queryClient.invalidateQueries({ queryKey: ["notes"] });
+            router.push("/Dashboard/Notes");
+          }
+        }
+      } catch (error) {
+        const apiError = error as AxiosError<{ message?: string }>;
+
+        if (apiError.response?.status === 403) {
+          toast.error("Access denied. Please login as admin.");
+          router.push("/login");
+          return;
+        }
+
+        const errorMessage =
+          apiError.response?.data?.message ||
+          (isEdit ? "Failed to update note." : "Failed to create note.");
+
+        console.error("Save Note Error:", apiError);
+        toast.error(errorMessage);
+      } finally {
+        setSubmitting(false);
       }
-      console.error("AddNotes Error:", error);
-      toast.error(error?.response?.data?.message || "Something went wrong.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
-  const UpdateNote = async () => {
-    try {
-      setLoading(true);
+  const handleDelete = async () => {
+    if (!id || !isEdit) return;
 
-      const payload = new FormData();
-      payload.append("_id", String(formData._id));
-      payload.append("title", formData.title.trim());
-      payload.append("description", (formData.description || "").trim());
-
-      if (formData.pdfFile) {
-        payload.append("file", formData.pdfFile);
-      }
-
-      if (formData.imageFile) {
-        payload.append("image", formData.imageFile);
-      }
-
-      const response = await apiClient.put(EDIT_NOTES, payload, {
-        withCredentials: true,
-      });
-
-      if (response.status === 200) {
-        toast.success("Note updated successfully.");
-        queryClient.invalidateQueries({ queryKey: ["notes"] });
-        navigate("/admin/notes");
-      }
-    } catch (error: any) {
-      if (error.response && error.response.status === 403) {
-        toast.error("Access denied. Please login as admin.");
-        return navigate("/login");
-      }
-      console.error("UpdateNote Error:", error);
-      toast.error(error?.response?.data?.message || "Something went wrong.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const DeleteNote = async () => {
-    if (!formData._id) return;
-    const confirmDelete = window.confirm("Are you sure you want to delete this note?");
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this note? This action cannot be undone."
+    );
     if (!confirmDelete) return;
 
     try {
       setIsDeleting(true);
-      const response = await apiClient.delete(`${DELETE_NOTES}/${formData._id}`, {
+      const response = await apiClient.delete(`${DELETE_NOTES}/${id}`, {
         withCredentials: true,
       });
+
       if (response.status === 200) {
         toast.success("Note deleted successfully.");
         queryClient.invalidateQueries({ queryKey: ["notes"] });
-        navigate("/admin/notes");
+        router.push("/Dashboard/Notes");
       }
-    } catch (error: any) {
-      if (error.response && error.response.status === 403) {
+    } catch (error) {
+      const apiError = error as AxiosError<{ message?: string }>;
+      if (apiError.response?.status === 403) {
         toast.error("Access denied. Please login as admin.");
-        return navigate("/login");
+        router.push("/login");
+        return;
       }
-      console.error("DeleteNote Error:", error);
-      toast.error("Failed to delete note.");
+      console.error("DeleteNote Error:", apiError);
+      toast.error(apiError.response?.data?.message || "Failed to delete note.");
     } finally {
       setIsDeleting(false);
     }
   };
 
+  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const errors = await formik.validateForm();
+    if (Object.keys(errors).length > 0) {
+      formik.setTouched({
+        title: true,
+        description: true,
+        image: true,
+        pdf: true,
+      });
+      const firstError = Object.values(errors)[0];
+      if (typeof firstError === "string") {
+        toast.error(firstError);
+      } else if (Array.isArray(firstError)) {
+        toast.error(firstError[0]);
+      }
+      return;
+    }
+    formik.handleSubmit();
+  };
+
+  if (isEdit && isNoteLoading) {
+    return (
+      <div className="flex justify-center items-center h-[70vh]">
+        <Loading />
+      </div>
+    );
+  }
+
+  if (isEdit && isNoteError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+        <p className="text-red-400 text-lg">Failed to load note details</p>
+        <Button
+          varient="secondary"
+          text="Back to Notes"
+          onClick={() => router.push("/Dashboard/Notes")}
+          title="Back to Notes"
+        />
+      </div>
+    );
+  }
+
+  const pdfFileName = formik.values.pdf
+    ? formik.values.pdf.name
+    : formik.values.pdfUrl
+    ? formik.values.pdfUrl.split("/").pop() || formik.values.pdfUrl
+    : "";
+
   return (
     <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (formData._id) {
-          UpdateNote();
-          return;
-        }
-        AddNotes();
-      }}
-      className="p-4 sm:p-6 space-y-6"
+      onSubmit={handleFormSubmit}
+      className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto"
     >
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="text-xl font-semibold text-white">
-          {formData._id ? "Edit Note" : "Create Note"}
-        </h2>
+      {/* Top Header */}
+      <div className="flex items-center justify-between gap-3 pb-4 border-b border-gray-700">
+        <div>
+          <h2 className="text-2xl font-bold text-white">
+            {isEdit ? "Edit Note" : "Create Note"}
+          </h2>
+          <p className="text-xs text-gray-400 mt-1">
+            {isEdit
+              ? "Update details, cover image, or PDF document for this note"
+              : "Upload and publish a new study note or cheatsheet"}
+          </p>
+        </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
-            onClick={() => navigate("/admin/notes")}
-            className="px-4 py-2 text-gray-300 bg-gray-700 rounded-md hover:bg-gray-600 transition-colors"
-          >
-            Back
-          </button>
-          {formData._id && (
-            <button
+            varient="secondary"
+            text="Back"
+            onClick={() => router.push("/Dashboard/Notes")}
+            title="Back to Notes"
+          />
+          {isEdit && (
+            <Button
               type="button"
-              onClick={DeleteNote}
-              disabled={isDeleting || loading}
-              className="px-4 py-2 text-red-300 bg-red-900/40 border border-red-500 rounded-md hover:bg-red-900/60 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
-            </button>
+              varient="danger"
+              text="Delete"
+              Icon={FiTrash2}
+              onClick={handleDelete}
+              title="Delete Note"
+              isSubmitting={isDeleting}
+              ProcessText="Deleting..."
+            />
           )}
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">Image</label>
-        <div className="flex items-center gap-4">
-          <label className="relative flex flex-col items-center justify-center w-32 h-32 bg-gray-700 border-2 border-dashed border-gray-600 rounded-md cursor-pointer hover:bg-gray-600 overflow-hidden transition-colors">
-            {formData.note_image_url ? (
-              <img src={imagePreview || formData.note_image_url} alt="Preview" className="w-full h-full object-cover" />
-            ) : (
-              <div className="flex flex-col items-center p-4 text-gray-400">
-                <FiImage size={24} />
-                <span className="text-xs mt-2">Click to upload</span>
-              </div>
-            )}
-            <input
-              type="file"
-              className="hidden"
-              accept="image/*"
-              onChange={(e) => handleFileChange(e, "image")}
-            />
-          </label>
-          <div className="text-sm text-gray-400">
-            {formData.imageFile ? formData.imageFile.name : "Supports: JPG, PNG, WEBP"}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
-          <input
-            type="text"
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            placeholder="Note title"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">PDF Document</label>
-          <label className="flex items-center gap-3 bg-gray-700 border border-gray-600 rounded-md px-4 py-2 hover:bg-gray-600 cursor-pointer transition-colors">
-            <FiFileText className="text-gray-300" size={18} />
-            <span className="text-gray-300 truncate">{formData.note_pdf_url || "Choose PDF file"}</span>
-            <input
-              type="file"
-              className="hidden"
-              accept=".pdf"
-              onChange={(e) => handleFileChange(e, "pdf")}
-            />
-          </label>
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
-        <textarea
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          rows={5}
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-          placeholder="Describe this note..."
+      {/* Cover Image Upload Section */}
+      <div className="rounded-2xl border border-gray-700 bg-gray-800/80 p-4 sm:p-5 shadow-lg">
+        <Input
+          name="image"
+          lable="Note Cover Image"
+          inputType="Image"
+          imagePreview={formik.values.imageUrl}
+          handleImageChange={(file) => {
+            formik.setFieldValue("image", file ?? undefined);
+            formik.setFieldTouched("image", true);
+          }}
+          error={
+            formik.touched.image && formik.errors.image
+              ? (formik.errors.image as string)
+              : undefined
+          }
         />
       </div>
 
-      <div className="flex justify-end gap-3 border-t border-gray-700 pt-6">
-        {formData._id && (
-          <button
-            type="button"
-            onClick={DeleteNote}
-            disabled={isDeleting || loading}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center justify-center min-w-30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      {/* Form Fields Section */}
+      <div className="grid gap-5">
+        {/* Title Input */}
+        <div>
+          <Input
+            type="text"
+            name="title"
+            lable="Title"
+            value={formik.values.title}
+            inputType="input"
+            onChange={(value) => formik.setFieldValue("title", value)}
+            onBlur={() => formik.setFieldTouched("title", true)}
+            placeholder="e.g. Next.js 15 App Router Cheatsheet"
+            error={
+              formik.touched.title && formik.errors.title
+                ? (formik.errors.title as string)
+                : undefined
+            }
+          />
+        </div>
+
+        {/* PDF File Upload Section */}
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            PDF Document
+          </label>
+          <label
+            className={`group flex items-center justify-between gap-3 bg-gray-700/70 border ${
+              formik.touched.pdf && formik.errors.pdf
+                ? "border-red-500"
+                : "border-gray-600 hover:border-purple-500"
+            } rounded-md px-4 py-3 cursor-pointer transition-colors`}
           >
-            <FiTrash2 className="mr-2" />
-            {isDeleting ? "Deleting..." : "Delete"}
-          </button>
-        )}
-        <button
-          type="submit"
-          disabled={loading || isDeleting}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center min-w-30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {loading ? (
-            "Processing..."
-          ) : (
-            <>
-              <FiUpload className="mr-2" />
-              {formData._id ? "Update Note" : "Create Note"}
-            </>
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="p-2 rounded-lg bg-red-500/10 text-red-400">
+                <FiFileText size={20} />
+              </div>
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-sm text-white truncate font-medium">
+                  {pdfFileName || "Click to choose PDF file"}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {formik.values.pdf
+                    ? `${(formik.values.pdf.size / (1024 * 1024)).toFixed(2)} MB`
+                    : "PDF documents up to 25 MB"}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs bg-gray-600 text-gray-200 px-3 py-1.5 rounded-md group-hover:bg-purple-600 transition-colors shrink-0">
+                {pdfFileName ? "Replace PDF" : "Browse"}
+              </span>
+            </div>
+            <input
+              type="file"
+              className="hidden"
+              accept=".pdf,application/pdf"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                formik.setFieldValue("pdf", file ?? undefined);
+                formik.setFieldTouched("pdf", true);
+              }}
+            />
+          </label>
+          {formik.touched.pdf && formik.errors.pdf && (
+            <p className="text-red-500 text-xs mt-1">
+              {formik.errors.pdf as string}
+            </p>
           )}
-        </button>
+        </div>
+
+        {/* Description Textarea */}
+        <div>
+          <Input
+            name="description"
+            lable="Description"
+            value={formik.values.description}
+            inputType="textarea"
+            onChange={(value) => formik.setFieldValue("description", value)}
+            onBlur={() => formik.setFieldTouched("description", true)}
+            placeholder="Describe what this note covers..."
+            error={
+              formik.touched.description && formik.errors.description
+                ? (formik.errors.description as string)
+                : undefined
+            }
+          />
+        </div>
+      </div>
+
+      {/* Form Action Buttons */}
+      <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-700">
+        <Button
+          type="button"
+          varient="secondary"
+          text="Cancel"
+          onClick={() => router.push("/Dashboard/Notes")}
+          title="Cancel"
+        />
+
+        {isEdit && (
+          <Button
+            type="button"
+            varient="danger"
+            text="Delete"
+            Icon={FiTrash2}
+            onClick={handleDelete}
+            title="Delete Note"
+            isSubmitting={isDeleting}
+            ProcessText="Deleting..."
+          />
+        )}
+
+        <Button
+          type="submit"
+          varient="primary"
+          Icon={FiUpload}
+          text={isEdit ? "Update Note" : "Create Note"}
+          title={isEdit ? "Update Note" : "Create Note"}
+          isSubmitting={formik.isSubmitting}
+          ProcessText="Saving..."
+        />
       </div>
     </form>
   );

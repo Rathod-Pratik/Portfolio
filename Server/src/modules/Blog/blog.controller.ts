@@ -1,4 +1,4 @@
-import blogModel from "./blog.model.ts";
+import {blogModel} from "./Blog.model.ts";
 import {
   Get_Signed_Url,
   uploadFileToS3,
@@ -6,59 +6,17 @@ import {
   getCache,
   getCacheVersion,
   incrementCacheVersion,
-  BlogCacheKeys
+  BlogCacheKeys,
+  setCache
 } from "@utils";
 import type { Request, Response } from "express";
-import {
-  addBlogListCacheJob,
-  addBlogItemCacheJob,
-} from "./Blog.queue.ts";
+import { CreateBlogJob } from "./Blog.queue.ts";
 
 import {
   sendInfoNotification,
   sendDangerNotification,
 } from "@modules/Notification/Notification.service.ts";
-
-const toErrorMessage = (
-  error: unknown
-): string => {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
-};
-
-const signBlogCoverImage = async <
-  T extends { coverImage?: string }
->(
-  blog: T
-) => {
-  if (
-    blog.coverImage &&
-    typeof blog.coverImage === "string" &&
-    !blog.coverImage.startsWith("http")
-  ) {
-    try {
-      const signedUrl =
-        await Get_Signed_Url({
-          key: blog.coverImage,
-        });
-
-      return {
-        ...blog,
-        coverImage: signedUrl,
-      };
-    } catch (error) {
-      console.error(
-        "Failed to sign blog cover image:",
-        error
-      );
-    }
-  }
-
-  return blog;
-};
+import type { IBlog } from "./Blog.types.ts";
 
 export const createBlog = async (
   req: Request,
@@ -66,6 +24,7 @@ export const createBlog = async (
 ) => {
   try {
     const {
+      _id,
       title,
       slug,
       excerpt,
@@ -92,50 +51,35 @@ export const createBlog = async (
         folderType: "Blog",
       });
 
-    const blog =
-      await blogModel.create({
-        title,
-        slug,
-        excerpt,
-        content,
-        coverImage:
-          uploadedFile.key,
-        tags: tags || [],
-        isPublished:
-          isPublished ?? false,
-      });
 
-    const version =
-      await incrementCacheVersion(
-        BlogCacheKeys.listVersion()
-      );
 
-    await addBlogListCacheJob(
-      version,
-      1,
-      10
-    );
+
+    await CreateBlogJob({
+      _id,
+      title,
+      slug,
+      excerpt,
+      content,
+      image: uploadedFile.key,
+      tags,
+      isPublished,
+    });
+
 
     await sendInfoNotification(
-      "Blog Created",
-      `Blog "${title}" was created successfully.`
+      "Blog Creation",
+      `Blog "${title}" was added to the creation queue and is being processed.`,
     );
 
     return res.status(201).json({
       message:
-        "Blog created successfully",
-      blog,
+        `Blog "${title}" was added to the creation queue and is being processed.`
     });
   } catch (error) {
     await sendDangerNotification(
       "Blog Creation Failed",
       "Failed to create blog."
     );
-
-    return res.status(500).json({
-      message: "Error creating blog",
-      error: toErrorMessage(error),
-    });
   }
 };
 
@@ -144,20 +88,12 @@ export const getBlogs = async (
   res: Response
 ) => {
   try {
-    const page =
-      Math.max(
-        Number(req.query.page) || 1,
-        1
-      );
+    let page = Number(req.query.page) || 1;
+    let limit = Number(req.query.limit) || 10;
 
-    const limit =
-      Math.min(
-        Math.max(
-          Number(req.query.limit) || 10,
-          1
-        ),
-        100
-      );
+    if (page < 1) page = 1;
+    if (limit < 1) limit = 10;
+    if (limit > 100) limit = 100;
 
     const version =
       await getCacheVersion(
@@ -177,6 +113,7 @@ export const getBlogs = async (
     if (cachedBlogs) {
       return res.status(200).json({
         blog: cachedBlogs,
+        'source': 'cache',
       });
     }
 
@@ -193,27 +130,30 @@ export const getBlogs = async (
         .limit(limit)
         .lean();
 
-    const signedBlogs =
-      await Promise.all(
-        blogs.map((blog) =>
-          signBlogCoverImage(blog)
-        )
-      );
-
-    await addBlogListCacheJob(
-      version,
-      page,
-      limit
+    const signedBlogs = await Promise.all(
+      blogs.map(async (blog: IBlog) => ({
+        ...blog,
+        image: blog.image
+          ? await Get_Signed_Url({
+            key: blog.image,
+          })
+          : null,
+      })),
     );
-
+    await setCache(
+      cacheKey,
+      signedBlogs,
+      600
+    );
+    
     return res.status(200).json({
       blog: signedBlogs,
+      'source': 'database',
     });
   } catch (error) {
     return res.status(500).json({
       message:
         "Error fetching blogs",
-      error: toErrorMessage(error),
     });
   }
 };
@@ -261,22 +201,24 @@ export const getBlogBySlug = async (
       });
     }
 
-    const signedBlog =
-      await signBlogCoverImage(blog);
+    if (blog.image) {
+      blog.image = await Get_Signed_Url({
+        key: blog.image,
+      });
+    }
 
-    await addBlogItemCacheJob(
-      id,
-      version
+    setCache(
+      cacheKey,
+      blog,
+      600
     );
-
     return res.status(200).json(
-      signedBlog
+      blog
     );
   } catch (error) {
     return res.status(500).json({
       message:
         "Error fetching blog",
-      error: toErrorMessage(error),
     });
   }
 };
@@ -286,10 +228,8 @@ export const updateBlog = async (
   res: Response
 ) => {
   try {
-    const { id } =
-      req.params as {
-        id: string;
-      };
+    const { id } = req.params as { id: string };
+    const { title, slug, excerpt, content, tags, isPublished } = req.body;
 
     const file =
       getUploadedFile(req);
@@ -298,10 +238,10 @@ export const updateBlog = async (
       ...req.body,
     };
 
-    const oldBlog =
+    const blog =
       await blogModel.findById(id);
 
-    if (!oldBlog) {
+    if (!blog) {
       return res.status(404).json({
         message: "Blog not found",
       });
@@ -318,61 +258,30 @@ export const updateBlog = async (
           folderType: "Blog",
         });
 
-      updateData.coverImage =
+      updateData.image =
         uploadedFile.key;
     }
 
-    const updatedBlog =
-      await blogModel.findByIdAndUpdate(
-        id,
-        updateData,
-        {
-          new: true,
-          runValidators: true,
-        }
-      );
-
-    if (!updatedBlog) {
-      return res.status(404).json({
-        message: "Blog not found",
-      });
-    }
-
-    const listVersion =
-      await incrementCacheVersion(
-        BlogCacheKeys.listVersion()
-      );
-
-    const itemVersion =
-      await incrementCacheVersion(
-        BlogCacheKeys.detailsVersion(id)
-      );
-
-    await addBlogListCacheJob(
-      listVersion,
-      1,
-      10
-    );
-
-    await addBlogItemCacheJob(
-      id,
-      itemVersion
-    );
+    await CreateBlogJob({
+      _id: id,
+      title,
+      slug,
+      excerpt,
+      content,
+      image: updateData.image,
+      tags,
+      isPublished,
+    });
 
     await sendInfoNotification(
-      "Blog Updated",
-      `Blog "${updatedBlog.title}" was updated successfully.`
+      "Blog Update",
+      `Blog "${title}" was added to the update queue and is being processed.`,
     );
-
-    const signedBlog =
-      await signBlogCoverImage(
-        updatedBlog.toObject()
-      );
 
     return res.status(200).json({
       message:
-        "Blog updated successfully",
-      updatedBlog: signedBlog,
+        "Blog updated under processing",
+      
     });
   } catch (error) {
     await sendDangerNotification(
@@ -382,8 +291,7 @@ export const updateBlog = async (
 
     return res.status(500).json({
       message:
-        "Error updating blog",
-      error: toErrorMessage(error),
+        "Error updating blog"
     });
   }
 };
@@ -411,26 +319,18 @@ export const deleteBlog = async (
       await blogModel.findByIdAndDelete(
         id
       );
+      if (!deletedBlog) {
+        return res.status(404).json({
+          message: "Blog not found",
+        });
+      }
 
-    if (!deletedBlog) {
-      return res.status(404).json({
-        message: "Blog not found",
-      });
-    }
-
-    const listVersion =
       await incrementCacheVersion(
         BlogCacheKeys.listVersion()
       );
 
     await incrementCacheVersion(
       BlogCacheKeys.detailsVersion(id)
-    );
-
-    await addBlogListCacheJob(
-      listVersion,
-      1,
-      10
     );
 
     await sendInfoNotification(
@@ -450,8 +350,7 @@ export const deleteBlog = async (
 
     return res.status(500).json({
       message:
-        "Error deleting blog",
-      error: toErrorMessage(error),
+        "Error deleting blog"
     });
   }
 };

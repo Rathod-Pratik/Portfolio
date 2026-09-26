@@ -1,11 +1,17 @@
 import { Queue } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import type { IExpertiseCacheJob } from "./Expertise.types.ts";
+import type {
+    ICreateExpertiseJob,
+    IUpdateExpertiseJob,
+    IExpertice,
+} from "./Expertise.types.ts";
 
-export const EXPERTISE_QUEUE_NAME = "expertise-cache";
+export const EXPERTISE_QUEUE_NAME = "expertise";
 
 export const expertiseQueue =
-    new Queue<IExpertiseCacheJob>(
+    new Queue<
+        ICreateExpertiseJob | IUpdateExpertiseJob
+    >(
         EXPERTISE_QUEUE_NAME,
         {
             connection: bellmqConnection,
@@ -21,32 +27,28 @@ export const expertiseQueue =
         }
     );
 
-export const addExpertiseListCacheJob = async (
-    version: number,
-    page: number,
-    limit: number
+export const addCreateExpertiseJob = async (
+    data: IExpertice
 ) => {
     return await expertiseQueue.add(
-        "expertise-list-cache",
+        "create-expertise",
         {
-            type: "list",
-            version,
-            page,
-            limit,
+            type: "create",
+            data,
         }
     );
 };
 
-export const addExpertiseDetailsCacheJob = async (
+export const addUpdateExpertiseJob = async (
     expertiseId: string,
-    version: number
+    data: Partial<IExpertice>
 ) => {
     return await expertiseQueue.add(
-        "expertise-details-cache",
+        "update-expertise",
         {
-            type: "details",
+            type: "update",
             expertiseId,
-            version,
+            data,
         }
     );
 };

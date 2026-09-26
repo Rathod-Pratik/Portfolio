@@ -1,52 +1,47 @@
 import { Queue } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import type { IExperienceCacheJob } from "./Experience.types.ts";
+import type { IExperienceJob, IExperience } from "./Experience.types.ts";
 
-export const EXPERIENCE_QUEUE_NAME = "experience-cache";
+export const EXPERIENCE_QUEUE_NAME = "experience";
 
-export const experienceQueue =
-    new Queue<IExperienceCacheJob>(
-        EXPERIENCE_QUEUE_NAME,
-        {
-            connection: bellmqConnection,
-            defaultJobOptions: {
-                attempts: 3,
-                backoff: {
-                    type: "exponential",
-                    delay: 1000,
-                },
-                removeOnComplete: 100,
-                removeOnFail: 100,
+export const experienceQueue = new Queue<IExperienceJob>(
+    EXPERIENCE_QUEUE_NAME,
+    {
+        connection: bellmqConnection,
+        defaultJobOptions: {
+            attempts: 3,
+            backoff: {
+                type: "exponential",
+                delay: 1000,
             },
-        }
-    );
+            removeOnComplete: 100,
+            removeOnFail: 100,
+        },
+    }
+);
 
-export const addExperienceListCacheJob = async (
-    version: number,
-    page: number,
-    limit: number
+export const addCreateExperienceJob = async (
+    data: IExperience
 ) => {
     return await experienceQueue.add(
-        "experience-list-cache",
+        "create-experience",
         {
-            type: "list",
-            version,
-            page,
-            limit,
+            type: "create",
+            data,
         }
     );
 };
 
-export const addExperienceDetailsCacheJob = async (
+export const addUpdateExperienceJob = async (
     experienceId: string,
-    version: number
+    data: IExperience
 ) => {
     return await experienceQueue.add(
-        "experience-details-cache",
+        "update-experience",
         {
-            type: "details",
+            type: "update",
             experienceId,
-            version,
+            data,
         }
     );
 };

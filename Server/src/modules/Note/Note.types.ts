@@ -18,12 +18,17 @@ export interface IUpdateNote {
 
 export type NoteDocument = HydratedDocument<INote>;
 
-export type NoteCacheJobAction =
-    | "created"
-    | "updated"
-    | "deleted";
-
-export interface INoteCacheJob {
-    action: NoteCacheJobAction;
-    noteId?: string;
+export interface ICreateNoteJob {
+    type: "create";
+    data: INote;
 }
+
+export interface IUpdateNoteJob {
+    type: "update";
+    noteId: string;
+    data: Partial<INote>;
+}
+
+export type INoteJob =
+    | ICreateNoteJob
+    | IUpdateNoteJob;

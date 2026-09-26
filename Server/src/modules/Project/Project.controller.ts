@@ -1,132 +1,31 @@
-import { Project } from './project.model.ts';
-import { Get_Signed_Url, deleteFile, uploadFileToS3 } from '@utils';
+import { Project } from './Project.model.ts';
+import { Get_Signed_Url, getUploadedFile, uploadFileToS3 } from '@utils';
 import type { Request, Response } from 'express';
-import type {
-  CreateProjectRequestBody,
-  EditProjectRequestBody,
-  ProjectIdParams,
-  UpdateProjectData,
-} from '@type';
-
-const toErrorMessage = (error: unknown): string => {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
-};
-
-const getUploadedFile = (req: Request) => {
-  const files = req.files as
-    | {
-        file?: Express.Multer.File[];
-        image?: Express.Multer.File[];
-      }
-    | undefined;
-
-  return files?.file?.[0] ?? files?.image?.[0] ?? req.file ?? null;
-};
-
-const parseListField = (value: unknown): string[] => {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item)).filter(Boolean);
-  }
-
-  if (typeof value !== 'string') {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) {
-      return parsed.map((item) => String(item)).filter(Boolean);
-    }
-  } catch {
-    // fall through to comma-separated parsing
-  }
-
-  return value.split(',').map((item) => item.trim()).filter(Boolean);
-};
-
-const signProjectImage = async <T extends { images?: string }>(project: T) => {
-  if (project.images && typeof project.images === 'string' && !project.images.startsWith('http')) {
-    try {
-      const signed = await Get_Signed_Url({ key: project.images });
-      if (signed?.url) {
-        return { ...project, images: signed.url };
-      }
-    } catch (error) {
-      console.error('Failed to sign project image', error);
-    }
-  }
-
-  return project;
-};
-
-const checkMissingFields = (
-  requiredFields: readonly (keyof CreateProjectRequestBody)[],
-  body: CreateProjectRequestBody,
-): string[] => {
-  const missing: string[] = [];
-  for (const field of requiredFields) {
-    if (
-      body[field] === undefined ||
-      body[field] === null ||
-      body[field] === "" ||
-      (Array.isArray(body[field]) && body[field].length === 0)
-    ) {
-      missing.push(field);
-    }
-  }
-  return missing;
-};
+import { CreateProjectSchema, EditProjectSchema } from './Project.validation.ts';
+import { addCreateProjectJob, addUpdateProjectJob } from './Project.queue.ts';
+import { sendInfoNotification } from '@modules/Notification/Notification.index.ts';
 
 export const CreateProject = async (
   req: Request,
   res: Response,
 ) => {
+  const validation = CreateProjectSchema.safeParse(req.body);
+
+  if (!validation.success) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: validation.error.flatten().fieldErrors,
+    });
+  }
+
   try {
     const {
       title,
       subtitle,
-      description,
-      techStack,
-      features,
-      liveDemoLink,
-      difficult,
-    } = req.body;
+      difficult
+    } = validation.data;
     const file = getUploadedFile(req);
-
-      const requiredFields: readonly (keyof CreateProjectRequestBody)[] = [
-      "title",
-      "subtitle",
-      "description",
-      "techStack",
-      "features",
-      "liveDemoLink",
-      "difficult",
-    ];
-
-    // Check missing fields
-    const missingFields = checkMissingFields(requiredFields, req.body);
-
-    if (!file) {
-      missingFields.push("images");
-    }
-
-    if (missingFields.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Missing fields: ${missingFields.join(", ")}`,
-      });
-    }
-
-    if (!file) {
-      return res.status(400).json({
-        success: false,
-        message: "Project image is required",
-      });
-    }
 
     const uploadedFile = await uploadFileToS3({
       buffer: file.buffer,
@@ -135,28 +34,29 @@ export const CreateProject = async (
       folderType: 'Project',
     });
 
-    const project = await Project.create({
-      difficult,
+    const job = await addCreateProjectJob({
       title,
       subtitle,
-      techStack: parseListField(techStack),
-      description,
-      liveDemoLink,
-      images: uploadedFile.key,
-      features: parseListField(features),
+      difficult,
+      image: uploadedFile.key,
     });
 
-    return res.status(200).json({ success: true, data: project });
+    await sendInfoNotification(
+      "Project Created",
+      `Project "${title}" was added to the queue and is being processed.`,
+    );
+
+    return res.status(200).json({ success: true, message: 'Project created successfully', jobId: job.id });
   } catch (error) {
     return res.status(400).json({
       success: false,
-      message: toErrorMessage(error),
+      message: 'Something went wrong',
     });
   }
 };
 
 export const DeleteProject = async (
-  req: Request<ProjectIdParams>,
+  req: Request,
   res: Response,
 ) => {
   try {
@@ -170,13 +70,6 @@ export const DeleteProject = async (
       return res.status(400).send("Project not found");
     }
 
-    try {
-      if (projectData.images) {
-        await deleteFile(projectData.images);
-      }
-    } catch (error) {
-      console.error(error);
-    }
     const project = await Project.findByIdAndDelete(_id);
 
     if (project) {
@@ -187,23 +80,44 @@ export const DeleteProject = async (
   } catch (error) {
     return res.status(400).json({
       success: false,
-      message: toErrorMessage(error),
+      message: 'Some error is occured',
     });
   }
 };
 
-export const GetProject = async (_req: Request, res: Response) => {
+export const GetProject = async (req: Request, res: Response) => {
   try {
-    const project = await Project.find();
+    let page = Number(req.query.page) || 1;
+    let limit = Number(req.query.limit) || 10;
 
-    if (project) {
-      const signedProjects = await Promise.all(project.map((item) => signProjectImage(item.toObject ? item.toObject() : item)));
-      return res.status(200).json({ success: true, data: signedProjects });
+    if (page < 1) page = 1;
+    if (limit < 1) limit = 10;
+    if (limit > 100) limit = 100;
+
+    const project = await Project.find().limit(limit).skip((page - 1) * limit);
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "No projects found",
+      });
     }
+
+    const signedProjects = await Promise.all(
+      project.map(async (item) => {
+        if (item.image) {
+          item.image = await Get_Signed_Url({ key: item.image });
+        }
+
+        return item;
+      })
+    );
+    return res.status(200).json({ success: true, data: signedProjects });
+
   } catch (error) {
     return res.status(400).json({
       success: false,
-      message: toErrorMessage(error),
+      message: 'Some error is occured',
     });
   }
 };
@@ -212,44 +126,36 @@ export const EditProject = async (
   req: Request,
   res: Response,
 ) => {
+  const validation = EditProjectSchema.safeParse(req.body);
+
+  if (!validation.success) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: validation.error.flatten().fieldErrors,
+    });
+  }
+
   try {
     const {
       difficult,
       _id,
       title,
       subtitle,
-      githubLink,
-      features,
-      techStack,
-      liveDemoLink,
-      description,
-    } = req.body;
+    } = validation.data;
     const file = getUploadedFile(req);
 
     if (!_id) {
       return res.status(400).send("_id is required");
     }
 
-    const EditData: UpdateProjectData = {};
+    const EditData: Record<string, string> = {};
+
     if (title) EditData.title = title;
     if (difficult) EditData.difficult = difficult;
-    if (description) EditData.description = description;
-    if (liveDemoLink) EditData.liveDemoLink = liveDemoLink;
     if (subtitle) EditData.subtitle = subtitle;
-    if (techStack) EditData.techStack = parseListField(techStack);
-    if (features) EditData.features = parseListField(features);
-    if (githubLink) EditData.githubLink = githubLink;
 
     if (file) {
-      try {
-        const projectdata = await Project.findById(_id);
-        if (projectdata?.images) {
-          await deleteFile(projectdata.images);
-        }
-      } catch (error) {
-        console.error(error);
-      }
-
       const uploadedFile = await uploadFileToS3({
         buffer: file.buffer,
         fileName: file.originalname,
@@ -257,38 +163,46 @@ export const EditProject = async (
         folderType: 'Project',
       });
 
-      EditData.images = uploadedFile.key;
+      EditData.image = uploadedFile.key;
     }
 
-    const project = await Project.findByIdAndUpdate(_id, EditData, {
-      new: true,
+    const job = await addUpdateProjectJob(_id, EditData);
+
+    return res.status(202).json({
+      success: true,
+      message: "Project update job added successfully",
+      jobId: job.id,
     });
 
-    return res.status(200).json({ success: true, data: project });
   } catch (error) {
     return res.status(400).json({
       success: false,
-      message: toErrorMessage(error) || "Something went wrong",
+      message: "Something went wrong",
     });
   }
 };
 
 export const GetProjectData = async (
-  req: Request<ProjectIdParams>,
+  req: Request,
   res: Response,
 ) => {
   try {
-    const {_id}=req.params;
+    const { _id } = req.params;
 
-    if(!_id){
+    if (!_id) {
       return res.status(400).send("_id is required")
     }
 
-    const projectData=await Project.findById(_id);
-    if(projectData){
-      const signedProject = await signProjectImage(projectData.toObject ? projectData.toObject() : projectData);
-      return res.status(200).json({data:signedProject,success:true})
+    let projectData = await Project.findById(_id);
+    if (!projectData) {
+      return res.status(404).send("Project not found")
     }
+
+    if (projectData.image) {
+      projectData.image = await Get_Signed_Url({ key: projectData.image });
+    }
+
+    return res.status(200).json({ data: projectData, success: true })
   } catch (error) {
     console.log(error)
     return res.status(400).send("Some error is occured")

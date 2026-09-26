@@ -1,41 +1,53 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
 import {
-    incrementCacheVersion, NoteCacheKeys
+    incrementCacheVersion,
+    NoteCacheKeys,
 } from "@utils";
-import { sendInfoNotification } from "../Notification/Notification.service.ts";
-import {
-    NOTE_QUEUE_NAME,
-} from "./Note.queue.ts";
-import type {
-    INoteCacheJob,
-} from "./Note.types.ts";
+import { NOTE_QUEUE_NAME } from "./Note.queue.ts";
+import { NoteModel } from "./Note.model.ts";
+import type { INoteJob } from "./Note.types.ts";
 
-export const noteWorker = new Worker<INoteCacheJob>(
+export const noteWorker = new Worker<INoteJob>(
     NOTE_QUEUE_NAME,
     async (job) => {
-        const { action, noteId } = job.data;
+        if (job.data.type === "create") {
+            const note = await NoteModel.create(
+                job.data.data,
+            );
+
+            await incrementCacheVersion(
+                NoteCacheKeys.listVersion(),
+            );
+
+            return note;
+        }
+
+        const updatedNote =
+            await NoteModel.findByIdAndUpdate(
+                job.data.noteId,
+                job.data.data,
+                {
+                    new: true,
+                    runValidators: true,
+                },
+            );
+
+        if (!updatedNote) {
+            throw new Error("Note not found");
+        }
 
         await incrementCacheVersion(
             NoteCacheKeys.listVersion(),
         );
 
-        if (noteId) {
-            await incrementCacheVersion(
-                NoteCacheKeys.detailsVersion(noteId),
-            );
-        }
-
-        await sendInfoNotification(
-            "Note Updated",
-            `Note ${action} successfully.`,
+        await incrementCacheVersion(
+            NoteCacheKeys.detailsVersion(
+                job.data.noteId,
+            ),
         );
 
-        return {
-            success: true,
-            action,
-            noteId,
-        };
+        return updatedNote;
     },
     {
         connection: bellmqConnection,

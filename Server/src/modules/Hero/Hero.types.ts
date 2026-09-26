@@ -6,7 +6,9 @@ export interface IHero {
     image?: string;
 }
 
-export interface IHeroCacheJob {
-    type: "details";
-    version: number;
+export interface IUpdateHeroJob {
+    type: "update";
+    data: Partial<IHero>;
 }
+
+export type IHeroJob = IUpdateHeroJob;

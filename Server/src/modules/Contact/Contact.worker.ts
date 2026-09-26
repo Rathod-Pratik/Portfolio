@@ -1,42 +1,60 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { setCache } from "@utils";
+import { incrementCacheVersion, setCache } from "@utils";
 import { contactModel } from "./contact.model.ts";
 import {
     ContactCacheKeys,
 } from "@utils";
-import type { IContactCacheJob } from "./Contact.queue.ts";
+import type { ICreateContactJob } from "./Contact.queue.ts";
+import { sendInfoNotification } from "@modules/Notification/Notification.index.ts";
+import nodemailer from "nodemailer";
 
-export const contactWorker = new Worker<IContactCacheJob>(
+export const contactWorker = new Worker<ICreateContactJob>(
     "contact",
     async (job) => {
-        const { version, page, limit } = job.data;
+        const { name, email, mobile, message } = job.data;
 
-        const skip = (page - 1) * limit;
 
-        const contacts = await contactModel
-            .find()
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean();
+        const contact = await contactModel.create({
+            name,
+            email,
+            mobile,
+            message,
+        });
 
-        const cacheKey = ContactCacheKeys.list(
-            version,
-            page,
-            limit
+        if (!contact) {
+            throw new Error("Failed to create contact");
+        }
+
+        await incrementCacheVersion(
+            ContactCacheKeys.listVersion()
         );
 
-        await setCache(
-            cacheKey,
-            contacts,
-            600
+        await sendInfoNotification(
+            "New Contact",
+            `New contact received from ${name}.`
         );
+        const auth = nodemailer.createTransport({
+            service: "gmail",
+            secure: true,
+            port: 465,
+            auth: {
+                user: process.env.MAIL_USER,
+                pass: process.env.MAIL_PASSWORD,
+            },
+        });
 
-        return {
-            cacheKey,
-            count: contacts.length,
+        const receiver = {
+            from: email,
+            to: process.env.MAIL_USER,
+            subject: "Email from your Portfolio",
+            text: `Name: ${name}
+                    Email: ${email}
+                    Phone: ${mobile}
+                    Message: ${message}`,
         };
+
+        await auth.sendMail(receiver);
     },
     {
         connection: bellmqConnection,

@@ -6,9 +6,9 @@ import {
     GetNote,
     GetNoteById,
 } from "./Note.controller.ts";
-import { checkAdminCookie } from "../../middlewares/Auth.middleware.ts";
-import { updateAdminViews } from "../../middlewares/View.middleware.ts";
-import { uploadFiles } from "../../middlewares/multer.middleware.ts";
+import { checkAdminCookie } from "@Middleware/Auth.middleware.ts";
+import { updateAdminViews } from "@Middleware/View.middleware.ts";
+import { uploadFiles } from "@Middleware/multer.middleware.ts";
 
 const router = express.Router();
 

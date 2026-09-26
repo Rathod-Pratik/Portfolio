@@ -1,13 +1,14 @@
 import type { Request, Response } from "express";
 import { contactModel } from "./contact.model.ts";
-import nodemailer from "nodemailer";
+
 import {
   getCache,
   incrementCacheVersion,
   getCacheVersion,
   ContactCacheKeys,
+  setCache,
 } from "@utils";
-import { addContactCacheJob } from "./Contact.queue.ts";
+import { CreateContactJob } from "./Contact.queue.ts";
 import {
   sendInfoNotification,
   sendDangerNotification,
@@ -22,66 +23,19 @@ export const createContact = async (
       name,
       email,
       mobile,
-      projectType,
-      budget,
-      message,
-      status,
+      message
     } = req.body;
 
-    const contact = await contactModel.create({
+    await CreateContactJob({
       name,
       email,
       mobile,
-      projectType,
-      budget,
-      status: status || "new",
-      message,
+      message
     });
-
-    await incrementCacheVersion(
-      ContactCacheKeys.listVersion()
-    );
-
-    await addContactCacheJob(
-      await getCacheVersion(
-        ContactCacheKeys.listVersion()
-      ),
-      1,
-      10
-    );
-
-    await sendInfoNotification(
-      "New Contact",
-      `New contact received from ${name}.`
-    );
-
-    const auth = nodemailer.createTransport({
-      service: "gmail",
-      secure: true,
-      port: 465,
-      auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASSWORD,
-      },
-    });
-
-    const receiver = {
-      from: email,
-      to: process.env.MAIL_USER,
-      subject: "Email from your Portfolio",
-      text: `Name: ${name}
-Email: ${email}
-Phone: ${mobile}
-Project Type: ${projectType}
-Budget: ${budget}
-Message: ${message}`,
-    };
-
-    await auth.sendMail(receiver);
 
     return res.status(201).json({
       success: true,
-      data: contact,
+      message: "Contact created successfully",
     });
   } catch (error) {
     await sendDangerNotification(
@@ -134,12 +88,12 @@ export const GetContact = async (
       .limit(limit)
       .lean();
 
-    await addContactCacheJob(
-      version,
-      page,
-      limit
+    await setCache(
+      cacheKey,
+      contacts,
+      60 * 60
     );
-
+    
     return res.status(200).json({
       success: true,
       data: contacts,
@@ -157,8 +111,7 @@ export const UpdateContactStatus = async (
   res: Response
 ) => {
   try {
-    const { _id } = req.params;
-    const { status } = req.body;
+    const { status, _id } = req.body;
 
     const contact = await contactModel.findByIdAndUpdate(
       _id,
@@ -173,14 +126,8 @@ export const UpdateContactStatus = async (
       });
     }
 
-    const version = await incrementCacheVersion(
+     await incrementCacheVersion(
       ContactCacheKeys.listVersion()
-    );
-
-    await addContactCacheJob(
-      version,
-      1,
-      10
     );
 
     await sendInfoNotification(
@@ -222,14 +169,8 @@ export const DeleteContact = async (
       });
     }
 
-    const version = await incrementCacheVersion(
+   await incrementCacheVersion(
       ContactCacheKeys.listVersion()
-    );
-
-    await addContactCacheJob(
-      version,
-      1,
-      10
     );
 
     await sendInfoNotification(

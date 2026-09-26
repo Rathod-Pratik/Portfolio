@@ -3,7 +3,7 @@ export interface IBlog {
     slug: string;
     excerpt: string;
     content: string;
-    coverImage: string;
+    image: string;
     tags: string[];
     author: string;
     isPublished: boolean;

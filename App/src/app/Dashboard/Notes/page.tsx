@@ -57,12 +57,12 @@ const Notes = () => {
                     type="text"
                     placeholder="Search Notes"
                 />
-                <button
-                    onClick={() => router.push('/admin/notes/create')}
-                    className="text-white bg-blue-500 px-5 cursor-pointer py-2 rounded-md"
-                >
-                    New
-                </button>
+                <Button
+                    onClick={() => router.push('/Dashboard/Notes/create')}
+                    text="New"
+                    varient="primary"
+                    title="New Note"
+                />
             </div>
 
             <div>
@@ -96,19 +96,17 @@ const Notes = () => {
                                 <div className="mt-5 w-full">
                                     <div className="flex justify-evenly space-x-3 w-full">
                                         <Button
-                                            onClick={() => router.push(`/admin/notes/edit/${item._id}`)}
+                                            onClick={() => router.push(`/Dashboard/Notes/${item._id}`)}
                                             text="Edit"
                                             varient="secondary"
                                             Icon={FaEdit}
                                             title="Edit"
                                         />
-                                        <FaEdit className="mr-2" />
 
                                         <Button
                                             text="Delete"
                                             varient="danger"
                                             onClick={() => DeleteNote(item._id!)}
-
                                             title="Delete"
                                             Icon={FaTrash}
                                         />

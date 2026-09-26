@@ -1,32 +1,34 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { setCache, getCacheVersion, AboutCacheKeys } from "@utils";
+import { AboutCacheKeys, incrementCacheVersion } from "@utils";
 
 import type { IAboutCacheJob } from "./About.types.ts";
+import { AboutModel } from "./About.model.ts";
 
 export const aboutWorker = new Worker<IAboutCacheJob>(
     "about",
     async (job) => {
-        const { aboutId, content } = job.data;
+        const { content } = job.data;
 
-        const version = await getCacheVersion(
-            AboutCacheKeys.listVersion()
-        );
+        let about =
+            await AboutModel.findOne();
 
-        const cacheKey =
-            `${AboutCacheKeys.list(version, 1, 10)}`;
-
-        await setCache(
-            cacheKey,
-            {
-                _id: aboutId,
+        if (!about) {
+            about = await AboutModel.create({
                 content,
-            },
-            600
+            });
+        } else {
+            about.content = content;
+
+            await about.save();
+        }
+        await incrementCacheVersion(
+            AboutCacheKeys.detailsVersion('about')
         );
+
 
         console.log(
-            `About cache updated: ${cacheKey}`
+            `About cache updated for ID: ${about._id.toString()}`
         );
     },
     {

@@ -6,8 +6,18 @@ import { toast } from "react-toastify";
 import { FaTrash } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import type { AxiosError } from "axios";
-import type { ContactUsItem, GetContactResponse } from "@Type";
 import { Loading } from "@component";
+
+type ContactUsItem = {
+	_id: string;
+	name: string;
+	email: string;
+	mobile: string;
+	projectType: string;
+	budget: string;
+	status: "new" | "contacted" | "inProgress" | "closed";
+	message: string;
+};
 
 const ContactUs = () => {
   const navigate = useNavigate();
@@ -22,7 +32,7 @@ const ContactUs = () => {
   } = useQuery<ContactUsItem[]>({
     queryKey: ["contacts"],
     queryFn: async () => {
-      const response = await apiClient.get<GetContactResponse>(GET_CONTACT, {
+      const response = await apiClient.get(GET_CONTACT, {
         withCredentials: true,
       });
 

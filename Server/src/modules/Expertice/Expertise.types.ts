@@ -5,19 +5,17 @@ export interface IExpertice {
     linkTo?: string;
 }
 
-export interface IExpertiseListCacheJob {
-    type: "list";
-    version: number;
-    page: number;
-    limit: number;
+export interface ICreateExpertiseJob {
+    type: "create";
+    data: IExpertice;
 }
 
-export interface IExpertiseDetailsCacheJob {
-    type: "details";
+export interface IUpdateExpertiseJob {
+    type: "update";
     expertiseId: string;
-    version: number;
+    data: Partial<IExpertice>;
 }
 
-export type IExpertiseCacheJob =
-    | IExpertiseListCacheJob
-    | IExpertiseDetailsCacheJob;
+export type IExpertiseJob =
+    | ICreateExpertiseJob
+    | IUpdateExpertiseJob;

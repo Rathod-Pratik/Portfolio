@@ -1,4 +1,4 @@
-import { AdminModel } from './Admin.model.ts';
+import { AdminModel } from './Auth.model.ts';
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { randomInt } from "node:crypto";

@@ -1,5 +1,5 @@
 import mongoose, { type HydratedDocument } from "mongoose";
-import type { IProject } from '@type';
+import type { IProject } from './Project.types.ts';
 
 const projectSchema = new mongoose.Schema<IProject>(
   {
@@ -12,24 +12,11 @@ const projectSchema = new mongoose.Schema<IProject>(
       type: String,
       trim: true,
     },
-    description: {
+    difficult: {
       type: String,
-      required: true,
+      enum: ["Easy", "Medium", "Hard"],
     },
-    techStack: {
-      type: [String], 
-      required: true,
-    },
-    features: {
-      type: [String], 
-    },
-    liveDemoLink: {
-      type: String,
-    },
-    difficult:{
-      type: String,
-    },
-    images: {
+    image: {
       type: String, 
     },
   },

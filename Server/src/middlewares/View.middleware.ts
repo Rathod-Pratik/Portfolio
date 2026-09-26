@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { AdminModel } from '../modules/Auth/Admin.model.ts';
+import { AdminModel } from '../modules/Auth/Auth.model.ts';
 
 export const updateAdminViews = async (req:Request, res:Response, next:NextFunction) => {
   try {

@@ -4,11 +4,14 @@ import { bellmqConnection } from "@config/redis.ts";
 export const BLOG_QUEUE_NAME = "blog";
 
 export interface IBlogCacheJob {
-    type: "list" | "item";
-    version: number;
-    page?: number;
-    limit?: number;
-    blogId?: string;
+    _id?: string;
+    title?: string;
+    slug?: string;
+    excerpt?: string;
+    content?: string;
+    image?: string;
+    tags?: string[];
+    isPublished?: boolean;
 }
 
 export const blogQueue = new Queue<IBlogCacheJob>(
@@ -27,32 +30,9 @@ export const blogQueue = new Queue<IBlogCacheJob>(
     }
 );
 
-export const addBlogListCacheJob = async (
-    version: number,
-    page: number,
-    limit: number
-) => {
+export const CreateBlogJob = async (item: IBlogCacheJob) => {
     return await blogQueue.add(
-        "cache-blog-list",
-        {
-            type: "list",
-            version,
-            page,
-            limit,
-        }
-    );
-};
-
-export const addBlogItemCacheJob = async (
-    blogId: string,
-    version: number
-) => {
-    return await blogQueue.add(
-        "cache-blog-item",
-        {
-            type: "item",
-            version,
-            blogId,
-        }
+        "create-blog",
+        item
     );
 };

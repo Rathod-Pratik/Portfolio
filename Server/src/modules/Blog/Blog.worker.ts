@@ -1,140 +1,71 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
 import {
-    getCacheVersion,
-    setCache,
-    Get_Signed_Url,
     BlogCacheKeys,
+    incrementCacheVersion,
 } from "@utils";
-import blogModel from "./blog.model.ts";
+import { blogModel } from "./Blog.model.ts";
 import type {
     IBlogCacheJob,
 } from "./Blog.queue.ts";
-
-const signBlogCoverImage = async <T extends {
-    coverImage?: string;
-}>(
-    blog: T
-) => {
-    if (
-        blog.coverImage &&
-        typeof blog.coverImage === "string" &&
-        !blog.coverImage.startsWith("http")
-    ) {
-        try {
-            const signedUrl = await Get_Signed_Url({
-                key: blog.coverImage,
-            });
-
-            return {
-                ...blog,
-                coverImage: signedUrl,
-            };
-        } catch (error) {
-            console.error(
-                "Failed to sign blog cover image:",
-                error
-            );
-        }
-    }
-
-    return blog;
-};
+import { sendInfoNotification } from "@modules/Notification/Notification.index.ts";
 
 export const blogWorker = new Worker<IBlogCacheJob>(
     "blog",
     async (job) => {
-        if (job.data.type === "list") {
-            const {
-                version,
-                page = 1,
-                limit = 10,
-            } = job.data;
+        const {
+            title,
+            slug,
+            excerpt,
+            content,
+            tags,
+            image,
+            isPublished,
+            _id
+        } = job.data;
 
-            const skip = (page - 1) * limit;
-
-            const blogs = await blogModel
-                .find()
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit)
-                .lean();
-
-            const signedBlogs = await Promise.all(
-                blogs.map((blog) =>
-                    signBlogCoverImage(blog)
-                )
-            );
-
-            const cacheKey =
-                BlogCacheKeys.list(
-                    version,
-                    page,
-                    limit
-                );
-
-            await setCache(
-                cacheKey,
-                signedBlogs,
-                600
-            );
-
-            return {
-                cacheKey,
-                count: signedBlogs.length,
-            };
-        }
-
-        if (job.data.type === "item") {
-            const {
-                blogId,
-                version,
-            } = job.data;
-
-            if (!blogId) {
-                throw new Error(
-                    "Blog ID is required"
-                );
-            }
-
+        if (_id) {
             const blog =
-                await blogModel
-                    .findById(blogId)
-                    .lean();
-
-            if (!blog) {
-                return {
-                    cacheKey: BlogCacheKeys.details(
-                        blogId,
-                        version
-                    ),
-                    cached: false,
-                };
-            }
-
-            const signedBlog =
-                await signBlogCoverImage(blog);
-
-            const cacheKey =
-                BlogCacheKeys.details(
-                    blogId,
-                    version
+                await blogModel.findByIdAndUpdate(
+                    _id,
+                    {
+                        title,
+                        slug,
+                        excerpt,
+                        content,
+                        image,
+                        tags,
+                        isPublished,
+                    },
+                    { new: true }
                 );
-
-            await setCache(
-                cacheKey,
-                signedBlog,
-                600
-            );
-
-            return {
-                cacheKey,
-                cached: true,
-            };
+        } else {
+            const blog =
+                await blogModel.create({
+                    title,
+                    slug,
+                    excerpt,
+                    content,
+                    image,
+                    tags,
+                    isPublished:
+                        isPublished ?? false,
+                });
         }
 
-        throw new Error(
-            "Invalid blog cache job type"
+        await incrementCacheVersion(
+            BlogCacheKeys.listVersion()
+        );
+        if (_id) {
+
+            await incrementCacheVersion(
+                BlogCacheKeys.detailsVersion(_id)
+            );
+        }
+
+        await sendInfoNotification(
+            "Blog Created",
+            `Blog "${title}" was created successfully.`
         );
     },
     {

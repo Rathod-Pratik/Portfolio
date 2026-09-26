@@ -6,19 +6,17 @@ export interface IExperience {
     description: string;
 }
 
-export interface IExperienceListCacheJob {
-    type: "list";
-    version: number;
-    page: number;
-    limit: number;
+export interface ICreateExperienceJob {
+    type: "create";
+    data: IExperience;
 }
 
-export interface IExperienceDetailsCacheJob {
-    type: "details";
+export interface IUpdateExperienceJob {
+    type: "update";
     experienceId: string;
-    version: number;
+    data: IExperience;
 }
 
-export type IExperienceCacheJob =
-    | IExperienceListCacheJob
-    | IExperienceDetailsCacheJob;
+export type IExperienceJob =
+    | ICreateExperienceJob
+    | IUpdateExperienceJob;

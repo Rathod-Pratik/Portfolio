@@ -3,9 +3,10 @@ type NoteItem = {
 	title: string;
 	description: string;
 	note_image_url?: string;
-	note_pdf_url?: string;
 	imageUrl?: string;
+	note_pdf_url?: string;
 	fileUrl?: string;
+	pdfUrl?: string;
 	createdAt?: string;
 	updatedAt?: string;
 };

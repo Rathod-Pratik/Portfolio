@@ -39,6 +39,10 @@ export const AuthCacheKeys =
 export const ContactCacheKeys =
     createCacheKeys("contact");
 
+export const ResumeCacheKeys = createCacheKeys("resume");
+
+export const ProjectCacheKeys = createCacheKeys("project");
+
 export const OtpCacheKeys =
     createCacheKeys("otp");
 
@@ -53,6 +57,8 @@ export const NotificationCacheKeys =
 
 export const ExpertiseCacheKeys =
     createCacheKeys("expertise");
+
+export const SkillCacheKeys = createCacheKeys("skill");
 
 export const HeroCacheKeys =
     createCacheKeys("hero");

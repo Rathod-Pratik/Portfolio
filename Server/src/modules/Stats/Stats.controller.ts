@@ -1,23 +1,14 @@
-import { AdminModel } from '../Auth/Admin.model.ts';
-import blogModel from '../Blog/Blog.model.ts';
+import { AdminModel } from '../Auth/Auth.model.ts';
+import {blogModel} from '../Blog/Blog.model.ts';
 import { NoteModel } from '../Note/Note.model.ts';
-import { Project } from '../Project/project.model.ts';
+import { Project } from '../Project/Project.model.ts';
 import { contactModel } from '../Contact/contact.model.ts';
-import { SkillsModel } from '../Skill/skills.model.ts';
+import { SkillsModel } from '../Skill/Skills.model.ts';
 import type { Request, Response } from 'express';
-import type { FetchStatesResponse, IncrementViewResponse } from '@type';
-
-const toErrorMessage = (error: unknown): string => {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
-};
 
 export const FetchStates = async (
   _req: Request,
-  res: Response<FetchStatesResponse | { message: string }>,
+  res: Response,
 ) => {
   try {
     const admin = await AdminModel.findOne();
@@ -42,7 +33,7 @@ export const FetchStates = async (
 
 export const IncrementView = async (
   _req: Request,
-  res: Response<IncrementViewResponse | { message: string; error?: string }>,
+  res: Response,
 ) => {
   try {
     const admin = await AdminModel.findOneAndUpdate(
@@ -61,6 +52,6 @@ export const IncrementView = async (
   } catch (error) {
     return res
       .status(500)
-      .json({ message: "Internal server error", error: toErrorMessage(error) });
+      .json({ message: "Internal server error" });
   }
 };

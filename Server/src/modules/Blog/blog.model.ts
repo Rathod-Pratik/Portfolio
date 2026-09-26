@@ -1,7 +1,7 @@
 import mongoose, {
   type HydratedDocument,
 } from "mongoose";
-import type { IBlog } from "@type";
+import type { IBlog } from "./Blog.types.ts";
 
 const blogSchema = new mongoose.Schema<IBlog>(
   {
@@ -30,7 +30,7 @@ const blogSchema = new mongoose.Schema<IBlog>(
       required: true,
     },
 
-    coverImage: {
+    image: {
       type: String,
       default: "",
     },
@@ -58,10 +58,8 @@ const blogSchema = new mongoose.Schema<IBlog>(
 export type BlogDocument =
   HydratedDocument<IBlog>;
 
-const blogModel =
+export const blogModel =
   mongoose.model<IBlog>(
     "Blog",
     blogSchema
   );
-
-export default blogModel;

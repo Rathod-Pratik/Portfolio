@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { AboutModel } from "./About.model.ts";
-import { getCache, incrementCacheVersion, getCacheVersion, AboutCacheKeys } from "@utils";
+import { getCache, setCache, getCacheVersion, AboutCacheKeys } from "@utils";
 import { addAboutCacheJob } from "./About.queue.ts";
 import { sendInfoNotification } from "@modules/Notification/Notification.service.ts";
 
@@ -11,19 +11,20 @@ export const getAbout = async (
 ) => {
   try {
     const version = await getCacheVersion(
-      AboutCacheKeys.listVersion()
+      AboutCacheKeys.detailsVersion('about')
     );
 
     const cacheKey =
-      `${AboutCacheKeys.list(version, 1, 10)}`;
+      `${AboutCacheKeys.details('about', version)}`;
 
     const cachedAbout =
       await getCache(cacheKey);
 
     if (cachedAbout) {
-      return res.status(200).json(
-        cachedAbout
-      );
+      return res.status(200).json({
+        data: cachedAbout,
+        'source': 'cache',
+      });
     }
 
     const about =
@@ -35,12 +36,16 @@ export const getAbout = async (
       });
     }
 
-    await addAboutCacheJob({
-      id: about._id.toString(),
-      content: about.content,
-    });
+    await setCache(
+      cacheKey,
+      about,
+      600
+    );
 
-    return res.status(200).json(about);
+    return res.status(200).json({
+      data: about,
+      'source': 'database',
+    });
   } catch (error) {
     console.error(
       "Get About error:",
@@ -60,26 +65,8 @@ export const updateAbout = async (
   try {
     const { content } = req.body;
 
-    let about =
-      await AboutModel.findOne();
-
-    if (!about) {
-      about = await AboutModel.create({
-        content,
-      });
-    } else {
-      about.content = content;
-
-      await about.save();
-    }
-
-    await incrementCacheVersion(
-      AboutCacheKeys.listVersion()
-    );
-
     await addAboutCacheJob({
-      id: about._id.toString(),
-      content: about.content,
+      content: content,
     });
 
     await sendInfoNotification(
@@ -88,7 +75,6 @@ export const updateAbout = async (
     );
     return res.status(200).json({
       message: "About updated successfully",
-      about,
     });
   } catch (error) {
     console.error(

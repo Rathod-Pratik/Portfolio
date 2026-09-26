@@ -1,11 +1,11 @@
 import { Queue } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import type { IHeroCacheJob } from "./Hero.types.ts";
+import type { IHero, IHeroJob } from "./Hero.types.ts";
 
-export const HERO_QUEUE_NAME = "hero-cache";
+export const HERO_QUEUE_NAME = "hero";
 
 export const heroQueue =
-    new Queue<IHeroCacheJob>(
+    new Queue<IHeroJob>(
         HERO_QUEUE_NAME,
         {
             connection: bellmqConnection,
@@ -21,14 +21,14 @@ export const heroQueue =
         }
     );
 
-export const addHeroCacheJob = async (
-    version: number
+export const addUpdateHeroJob = async (
+    data: Partial<IHero>
 ) => {
     return await heroQueue.add(
-        "hero-cache",
+        "update-hero",
         {
-            type: "details",
-            version,
+            type: "update",
+            data,
         }
     );
 };
