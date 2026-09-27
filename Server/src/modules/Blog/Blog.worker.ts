@@ -8,7 +8,9 @@ import { blogModel } from "./Blog.model.ts";
 import type {
     IBlogCacheJob,
 } from "./Blog.queue.ts";
-import { sendInfoNotification } from "@modules/Notification/Notification.index.ts";
+import {
+    sendInfoNotification,
+} from "@modules/Notification/Notification.index.ts";
 
 export const blogWorker = new Worker<IBlogCacheJob>(
     "blog",
@@ -21,7 +23,7 @@ export const blogWorker = new Worker<IBlogCacheJob>(
             tags,
             image,
             isPublished,
-            _id
+            _id,
         } = job.data;
 
         if (_id) {
@@ -37,35 +39,48 @@ export const blogWorker = new Worker<IBlogCacheJob>(
                         tags,
                         isPublished,
                     },
-                    { new: true }
+                    {
+                        new: true,
+                    }
                 );
-        } else {
-            const blog =
-                await blogModel.create({
-                    title,
-                    slug,
-                    excerpt,
-                    content,
-                    image,
-                    tags,
-                    isPublished:
-                        isPublished ?? false,
-                });
-        }
 
-        await incrementCacheVersion(
-            BlogCacheKeys.listVersion()
-        );
-        if (_id) {
+            if (!blog) {
+                throw new Error("Blog not found");
+            }
+
+            await incrementCacheVersion(
+                BlogCacheKeys.listVersion()
+            );
 
             await incrementCacheVersion(
                 BlogCacheKeys.detailsVersion(_id)
             );
+
+            await sendInfoNotification(
+                "Blog Updated",
+                `Blog "${blog.title}" was updated successfully.`
+            );
+
+            return;
         }
+
+        const blog = await blogModel.create({
+            title,
+            slug,
+            excerpt,
+            content,
+            image,
+            tags,
+            isPublished: isPublished ?? false,
+        });
+
+        await incrementCacheVersion(
+            BlogCacheKeys.listVersion()
+        );
 
         await sendInfoNotification(
             "Blog Created",
-            `Blog "${title}" was created successfully.`
+            `Blog "${blog.title}" was created successfully.`
         );
     },
     {

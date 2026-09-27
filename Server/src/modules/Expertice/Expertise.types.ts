@@ -2,7 +2,7 @@ export interface IExpertice {
     title: string;
     description: string;
     image: string;
-    linkTo?: string;
+    isDeleted?: boolean;
 }
 
 export interface ICreateExpertiseJob {

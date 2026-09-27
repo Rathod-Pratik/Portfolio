@@ -1,5 +1,5 @@
 import mongoose, { type HydratedDocument } from "mongoose";
-import type { IExperience } from '@type';
+import type { IExperience } from './Experience.types.ts';
 
 const experienceSchema = new mongoose.Schema<IExperience>(
   {
@@ -18,6 +18,10 @@ const experienceSchema = new mongoose.Schema<IExperience>(
     company: {
       type: String,
       required: true,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
     },
     description: {
       type: String,

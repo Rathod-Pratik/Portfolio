@@ -1,13 +1,14 @@
-import {blogModel} from "./Blog.model.ts";
+import { blogModel } from "./Blog.model.ts";
 import {
   Get_Signed_Url,
-  uploadFileToS3,
   getUploadedFile,
   getCache,
   getCacheVersion,
   incrementCacheVersion,
   BlogCacheKeys,
-  setCache
+  setCache,
+  uploadWithRetry,
+  ImageFileSchema
 } from "@utils";
 import type { Request, Response } from "express";
 import { CreateBlogJob } from "./Blog.queue.ts";
@@ -17,53 +18,61 @@ import {
   sendDangerNotification,
 } from "@modules/Notification/Notification.service.ts";
 import type { IBlog } from "./Blog.types.ts";
+import { BlogIdSchema, CreateBlogSchema, UpdateBlogSchema } from "./Blog.validation.ts";
 
 export const createBlog = async (
   req: Request,
   res: Response
 ) => {
   try {
+    const validate = CreateBlogSchema.safeParse(req.body);
+    if (!validate.success) {
+      return res.status(400).json({
+        message: "Invalid request body",
+        error: validate.error.issues,
+      });
+    }
+
     const {
-      _id,
       title,
       slug,
       excerpt,
       content,
       tags,
       isPublished,
-    } = req.body;
+    } = validate.data;
 
-    const file =
-      getUploadedFile(req);
+    const file = getUploadedFile(req);
 
-    if (!file) {
+    const fileValidate = ImageFileSchema.safeParse(file);
+
+    if (!fileValidate.success) {
       return res.status(400).json({
-        message:
-          "Cover image file is required",
+        message: "Invalid image file",
+        error: fileValidate.error.issues,
       });
     }
 
     const uploadedFile =
-      await uploadFileToS3({
-        buffer: file.buffer,
-        fileName: file.originalname,
-        fileType: file.mimetype,
-        folderType: "Blog",
-      });
+      await uploadWithRetry(
+        fileValidate.data as Express.Multer.File,
+        3,
+        "Blog",
+      );
 
-
-
-
-    await CreateBlogJob({
-      _id,
+    const blogData: IBlog = {
       title,
       slug,
       excerpt,
       content,
       image: uploadedFile.key,
       tags,
+      author: "Admin",
       isPublished,
-    });
+      isDeleted: false,
+    };
+
+    await CreateBlogJob(blogData);
 
 
     await sendInfoNotification(
@@ -117,16 +126,13 @@ export const getBlogs = async (
       });
     }
 
-    const skip =
-      (page - 1) * limit;
-
     const blogs =
       await blogModel
-        .find()
+        .find({ isDeleted: false })
         .sort({
           createdAt: -1,
         })
-        .skip(skip)
+        .skip((page - 1) * limit)
         .limit(limit)
         .lean();
 
@@ -145,7 +151,7 @@ export const getBlogs = async (
       signedBlogs,
       600
     );
-    
+
     return res.status(200).json({
       blog: signedBlogs,
       'source': 'database',
@@ -183,15 +189,17 @@ export const getBlogBySlug = async (
       await getCache(cacheKey);
 
     if (cachedBlog) {
-      return res.status(200).json(
-        cachedBlog
-      );
+      return res.status(200).json({
+        data: cachedBlog,
+        source: "cache",
+      });
     }
 
     const blog =
       await blogModel
         .findOne({
           _id: id,
+          isDeleted: false,
         })
         .lean();
 
@@ -212,9 +220,10 @@ export const getBlogBySlug = async (
       blog,
       600
     );
-    return res.status(200).json(
-      blog
-    );
+    return res.status(200).json({
+      data: blog,
+      source: "database",
+    });
   } catch (error) {
     return res.status(500).json({
       message:
@@ -225,21 +234,49 @@ export const getBlogBySlug = async (
 
 export const updateBlog = async (
   req: Request,
-  res: Response
+  res: Response,
 ) => {
   try {
-    const { id } = req.params as { id: string };
-    const { title, slug, excerpt, content, tags, isPublished } = req.body;
+    const validateParams = BlogIdSchema.safeParse(req.params);
 
-    const file =
-      getUploadedFile(req);
+    if (!validateParams.success) {
+      return res.status(400).json({
+        message: validateParams.error.issues,
+      });
+    }
 
-    const updateData = {
-      ...req.body,
-    };
+    const { id } = validateParams.data;
 
-    const blog =
-      await blogModel.findById(id);
+    const validateBody = UpdateBlogSchema.safeParse(req.body);
+
+    if (!validateBody.success) {
+      return res.status(400).json({
+        message: validateBody.error.issues,
+      });
+    }
+
+    const {
+      title,
+      slug,
+      excerpt,
+      content,
+      tags,
+      isPublished,
+    } = validateBody.data;
+
+    const file = getUploadedFile(req);
+    const fileValidate = ImageFileSchema.safeParse(file);
+
+    if (!fileValidate.success) {
+      return res.status(400).json({
+        message: fileValidate.error.issues,
+      });
+    }
+
+    const blog = await blogModel.findOne({
+      _id: id,
+      isDeleted: false,
+    });
 
     if (!blog) {
       return res.status(404).json({
@@ -247,30 +284,27 @@ export const updateBlog = async (
       });
     }
 
-    if (file) {
-      const uploadedFile =
-        await uploadFileToS3({
-          buffer: file.buffer,
-          fileName:
-            file.originalname,
-          fileType:
-            file.mimetype,
-          folderType: "Blog",
-        });
+    let image;
 
-      updateData.image =
-        uploadedFile.key;
+    if (file) {
+      const uploadedFile = await uploadWithRetry(
+        fileValidate.data as Express.Multer.File,
+        3,
+        "Blog",
+      );
+
+      image = uploadedFile.key;
     }
 
     await CreateBlogJob({
       _id: id,
-      title,
-      slug,
-      excerpt,
-      content,
-      image: updateData.image,
-      tags,
-      isPublished,
+      title: title ? title : blog.title,
+      slug: slug ? slug : blog.slug,
+      excerpt: excerpt ? excerpt : blog.excerpt,
+      content: content ? content : blog.content,
+      image: image ? image : blog.image,
+      tags: tags ? tags : blog.tags,
+      isPublished: isPublished ? isPublished : blog.isPublished,
     });
 
     await sendInfoNotification(
@@ -278,20 +312,17 @@ export const updateBlog = async (
       `Blog "${title}" was added to the update queue and is being processed.`,
     );
 
-    return res.status(200).json({
-      message:
-        "Blog updated under processing",
-      
+    return res.status(202).json({
+      message: "Blog update added to processing queue",
     });
   } catch (error) {
     await sendDangerNotification(
       "Blog Update Failed",
-      "Failed to update blog."
+      "Failed to update blog.",
     );
 
     return res.status(500).json({
-      message:
-        "Error updating blog"
+      message: "Error updating blog",
     });
   }
 };
@@ -306,12 +337,10 @@ export const deleteBlog = async (
         id: string;
       };
 
-    const blog =
-      await blogModel.findById(id);
-
-    if (!blog) {
-      return res.status(404).json({
-        message: "Blog not found",
+    const validate = BlogIdSchema.safeParse(req.params);
+    if (!validate.success) {
+      return res.status(400).json({
+        message: validate.error.issues,
       });
     }
 
@@ -319,15 +348,15 @@ export const deleteBlog = async (
       await blogModel.findByIdAndDelete(
         id
       );
-      if (!deletedBlog) {
-        return res.status(404).json({
-          message: "Blog not found",
-        });
-      }
+    if (!deletedBlog) {
+      return res.status(404).json({
+        message: "Blog not found",
+      });
+    }
 
-      await incrementCacheVersion(
-        BlogCacheKeys.listVersion()
-      );
+    await incrementCacheVersion(
+      BlogCacheKeys.listVersion()
+    );
 
     await incrementCacheVersion(
       BlogCacheKeys.detailsVersion(id)

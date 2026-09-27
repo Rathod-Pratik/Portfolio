@@ -1,9 +1,9 @@
 export interface IHero {
-    greeting?: string;
-    name?: string;
-    roles?: string[];
-    description?: string;
-    image?: string;
+    greeting: string;
+    name: string;
+    roles: string[];
+    description: string;
+    image: string;
 }
 
 export interface IUpdateHeroJob {

@@ -15,27 +15,28 @@ import {
     addUpdateExperienceJob,
 } from "./Experience.queue.ts";
 import { sendInfoNotification } from "@modules/Notification/Notification.service.ts";
-
-const toErrorMessage = (error: unknown): string => {
-    if (error instanceof Error) {
-        return error.message;
-    }
-
-    return String(error);
-};
+import { CreateExperienceSchema, UpdateExperienceSchema, ExperienceIdSchema } from "./Experience.validation.ts";
 
 export const createExperience = async (
     req: Request,
     res: Response
 ) => {
     try {
+        const validate = CreateExperienceSchema.safeParse(req.body);
+
+        if (!validate.success) {
+            return res.status(400).json({
+                message: validate.error.issues,
+            });
+        }
+
         const {
             year,
             duration,
             title,
             company,
             description,
-        } = req.body;
+        } = validate.data;
 
         const data: IExperience = {
             year,
@@ -58,7 +59,6 @@ export const createExperience = async (
     } catch (error) {
         return res.status(500).json({
             message: "Internal server error",
-            error: toErrorMessage(error),
         });
     }
 };
@@ -68,15 +68,12 @@ export const getExperiences = async (
     res: Response
 ) => {
     try {
-        const page = Math.max(
-            Number(req.query.page) || 1,
-            1
-        );
+        let page = Number(req.query.page) || 1;
+        let limit = Number(req.query.limit) || 10;
 
-        const limit = Math.max(
-            Number(req.query.limit) || 10,
-            1
-        );
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 10;
+        if (limit > 100) limit = 100;
 
         const version =
             await getCacheVersion(
@@ -94,15 +91,17 @@ export const getExperiences = async (
             await getCache(cacheKey);
 
         if (cachedExperiences) {
-            return res.status(200).json(
-                cachedExperiences
+            return res.status(200).json({
+                data: cachedExperiences,
+                source: "cache",
+            }
             );
         }
 
         const skip = (page - 1) * limit;
 
         const experiences =
-            await ExperienceModel.find()
+            await ExperienceModel.find({ isDeleted: false })
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
@@ -113,13 +112,14 @@ export const getExperiences = async (
             experiences
         );
 
-        return res.status(200).json(
-            experiences
+        return res.status(200).json({
+            data: experiences,
+            source: "database",
+        }
         );
     } catch (error) {
         return res.status(500).json({
-            message: "Internal server error",
-            error: toErrorMessage(error),
+            message: "Internal server error"
         });
     }
 };
@@ -129,7 +129,13 @@ export const getExperienceById = async (
     res: Response
 ) => {
     try {
-        const { id } = req.params;
+        const validate = ExperienceIdSchema.safeParse(req.params);
+        if (!validate.success) {
+            return res.status(400).json({
+                message: validate.error.issues,
+            });
+        }
+        const { id } = validate.data;
 
         const version =
             await getCacheVersion(
@@ -138,7 +144,7 @@ export const getExperienceById = async (
 
         const cacheKey =
             ExperienceCacheKeys.details(
-                  id as string,
+                id as string,
                 version
             );
 
@@ -146,13 +152,14 @@ export const getExperienceById = async (
             await getCache(cacheKey);
 
         if (cachedExperience) {
-            return res.status(200).json(
-                cachedExperience
-            );
+            return res.status(200).json({
+                data: cachedExperience,
+                source: "cache"
+            });
         }
 
         const experience =
-            await ExperienceModel.findById(id).lean();
+            await ExperienceModel.findOne({ _id: id, isDeleted: false }).lean();
 
         if (!experience) {
             return res.status(404).json({
@@ -165,13 +172,13 @@ export const getExperienceById = async (
             experience
         );
 
-        return res.status(200).json(
-            experience
-        );
+        return res.status(200).json({
+            data: experience,
+            source: "database"
+        });
     } catch (error) {
         return res.status(500).json({
             message: "Internal server error",
-            error: toErrorMessage(error),
         });
     }
 };
@@ -181,7 +188,20 @@ export const updateExperience = async (
     res: Response
 ) => {
     try {
-        const { id } = req.params;
+        const validate = UpdateExperienceSchema.safeParse(req.body);
+
+        if (!validate.success) {
+            return res.status(400).json({
+                message: validate.error.issues,
+            });
+        }
+        const ValidateId = ExperienceIdSchema.safeParse(req.params);
+        if (!ValidateId.success) {
+            return res.status(400).json({
+                message: ValidateId.error.issues,
+            });
+        }
+        const { id } = ValidateId.data;
 
         const {
             year,
@@ -189,10 +209,10 @@ export const updateExperience = async (
             title,
             company,
             description,
-        } = req.body;
+        } = validate.data;
 
         const existingExperience =
-            await ExperienceModel.findById(id).lean();
+            await ExperienceModel.findOne({ _id: id, isDeleted: false }).lean();
 
         if (!existingExperience) {
             return res.status(404).json({
@@ -200,17 +220,15 @@ export const updateExperience = async (
             });
         }
 
-        const data: IExperience = {
-            year,
-            duration,
-            title,
-            company,
-            description,
-        };
-
         await addUpdateExperienceJob(
-            id as string,
-            data
+            id,
+            {
+                year: year ? year : existingExperience.year,
+                duration: duration ? duration : existingExperience.duration,
+                title: title ? title : existingExperience.title,
+                company: company ? company : existingExperience.company,
+                description: description ? description : existingExperience.description,
+            }
         );
 
         await sendInfoNotification(
@@ -223,8 +241,7 @@ export const updateExperience = async (
         });
     } catch (error) {
         return res.status(500).json({
-            message: "Internal server error",
-            error: toErrorMessage(error),
+            message: "Internal server error"
         });
     }
 };
@@ -234,10 +251,16 @@ export const deleteExperience = async (
     res: Response
 ) => {
     try {
-        const { id } = req.params;
+        const validate = ExperienceIdSchema.safeParse(req.params);
+        if (!validate.success) {
+            return res.status(400).json({
+                message: validate.error.issues,
+            });
+        }
+        const { id } = validate.data;
 
         const experience =
-            await ExperienceModel.findByIdAndDelete(id);
+            await ExperienceModel.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
 
         if (!experience) {
             return res.status(404).json({
@@ -263,8 +286,7 @@ export const deleteExperience = async (
         });
     } catch (error) {
         return res.status(500).json({
-            message: "Internal server error",
-            error: toErrorMessage(error),
+            message: "Internal server error"
         });
     }
 };

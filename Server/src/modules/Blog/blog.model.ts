@@ -44,7 +44,10 @@ const blogSchema = new mongoose.Schema<IBlog>(
       type: String,
       default: "Admin",
     },
-
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
     isPublished: {
       type: Boolean,
       default: false,

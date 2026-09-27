@@ -1,5 +1,5 @@
 import mongoose, { type HydratedDocument } from "mongoose";
-import type { IContact } from "@type";
+import type { IContact } from "./Contact.types.ts";
 
 const ContactSchema = new mongoose.Schema<IContact>({
     name:{
@@ -32,6 +32,10 @@ const ContactSchema = new mongoose.Schema<IContact>({
         type:String,
         required:true,
     },
+    isDeleted:{
+        type:Boolean,
+        default:false,
+    }
 })
 
 export type ContactDocument = HydratedDocument<IContact>;

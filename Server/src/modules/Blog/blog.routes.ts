@@ -5,7 +5,7 @@ import {
   getBlogBySlug,
   updateBlog,
   deleteBlog,
-} from "./blog.controller.ts";
+} from "./Blog.controller.ts";
 import { checkAdminCookie } from "../../middlewares/Auth.middleware.ts";
 import { updateAdminViews } from "../../middlewares/View.middleware.ts";
 import { uploadFiles } from "../../middlewares/multer.middleware.ts";

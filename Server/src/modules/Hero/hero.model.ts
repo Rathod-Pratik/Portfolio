@@ -1,5 +1,5 @@
 import mongoose, { type HydratedDocument } from "mongoose";
-import type { IHero } from "@type";
+import type { IHero } from "./Hero.types.ts";
 
 const heroSchema = new mongoose.Schema<IHero>(
   {

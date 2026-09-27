@@ -16,23 +16,14 @@ import {
     setCache,
     uploadFileToS3,
     NoteCacheKeys,
-    incrementCacheVersion
+    incrementCacheVersion,
+    getUploadedFile,
+    getFiles,
+    uploadWithRetry,
+    ImageFileSchema,
+    PdfFileSchema
 } from "@utils";
 import { sendInfoNotification } from "../Notification/Notification.service.ts";
-
-const getFiles = (req: Request) => {
-    const files = req.files as
-        | {
-            file?: Express.Multer.File[];
-            image?: Express.Multer.File[];
-        }
-        | undefined;
-
-    return {
-        image: files?.image?.[0],
-        pdf: files?.file?.[0],
-    };
-};
 
 export const CreateNote = async (
     req: Request,
@@ -44,9 +35,7 @@ export const CreateNote = async (
 
         if (!validation.success) {
             return res.status(400).json({
-                success: false,
-                message:
-                    validation.error.issues[0]?.message,
+                message: validation.error.issues[0]?.message,
             });
         }
 
@@ -55,29 +44,33 @@ export const CreateNote = async (
 
         const { image, pdf } = getFiles(req);
 
-        if (!image || !pdf) {
+        const validateImage = ImageFileSchema.safeParse(image);
+
+        if (!validateImage.success) {
             return res.status(400).json({
-                success: false,
-                message:
-                    "Image and PDF files are required",
+                message: validateImage.error.issues[0]?.message,
             });
         }
 
-        const [uploadedImage, uploadedPdf] =
-            await Promise.all([
-                uploadFileToS3({
-                    buffer: image.buffer,
-                    fileName: image.originalname,
-                    fileType: image.mimetype,
-                    folderType: "Note",
-                }),
-                uploadFileToS3({
-                    buffer: pdf.buffer,
-                    fileName: pdf.originalname,
-                    fileType: pdf.mimetype,
-                    folderType: "Note",
-                }),
-            ]);
+        const validatePdf = PdfFileSchema.safeParse(pdf);
+
+        if (!validatePdf.success) {
+            return res.status(400).json({
+                message: validatePdf.error.issues[0]?.message,
+            });
+        }
+
+        const uploadedImage = await uploadWithRetry(
+            validateImage.data as Express.Multer.File,
+            3,
+            "Note/Image",
+        );
+
+        const uploadedPdf = await uploadWithRetry(
+            validatePdf.data as Express.Multer.File,
+            3,
+            "Note/PDF",
+        );
 
         const job = await addCreateNoteJob({
             title,
@@ -325,16 +318,16 @@ export const EditNote = async (
     req: Request,
     res: Response,
 ) => {
-         const validation =
-            UpdateNoteSchema.safeParse(req.body);
+    const validation =
+        UpdateNoteSchema.safeParse(req.body);
 
-        if (!validation.success) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    validation.error.issues[0]?.message,
-            });
-        }
+    if (!validation.success) {
+        return res.status(400).json({
+            success: false,
+            message:
+                validation.error.issues[0]?.message,
+        });
+    }
     try {
 
         const {

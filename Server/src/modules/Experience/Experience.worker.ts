@@ -6,6 +6,7 @@ import {
     ExperienceCacheKeys,
 } from "@utils";
 import type { IExperienceJob } from "./Experience.types.ts";
+import { sendInfoNotification } from "@modules/Notification/Notification.service.ts";
 
 export const experienceWorker = new Worker<IExperienceJob>(
     "experience",
@@ -18,7 +19,11 @@ export const experienceWorker = new Worker<IExperienceJob>(
             await incrementCacheVersion(
                 ExperienceCacheKeys.listVersion()
             );
-
+            
+            await sendInfoNotification(
+                "Experience Creation",
+                `New experience created: ${experience.title}.`
+            );
             return experience;
         }
 
@@ -46,6 +51,11 @@ export const experienceWorker = new Worker<IExperienceJob>(
             ExperienceCacheKeys.detailsVersion(
                 experienceId
             )
+        );
+
+        await sendInfoNotification(
+            "Experience Update",
+            `Experience updated: ${experience.title}.`
         );
 
         return experience;

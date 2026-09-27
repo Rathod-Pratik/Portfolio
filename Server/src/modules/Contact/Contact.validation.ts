@@ -14,6 +14,7 @@ export const CreateContactSchema = z.object({
 
 export const UpdateContactStatusSchema = z.object({
     status: z.enum(["new", "contacted", "inProgress", "closed"]),
+    _id: z.string().min(1, "_id is required"),
 });
 
 export const ContactIdSchema = z.object({

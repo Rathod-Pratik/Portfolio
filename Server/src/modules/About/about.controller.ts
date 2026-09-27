@@ -3,12 +3,14 @@ import { AboutModel } from "./About.model.ts";
 import { getCache, setCache, getCacheVersion, AboutCacheKeys } from "@utils";
 import { addAboutCacheJob } from "./About.queue.ts";
 import { sendInfoNotification } from "@modules/Notification/Notification.service.ts";
+import { AboutSchema } from "./About.validation.ts";
 
 
 export const getAbout = async (
   req: Request,
   res: Response
 ) => {
+
   try {
     const version = await getCacheVersion(
       AboutCacheKeys.detailsVersion('about')
@@ -62,13 +64,21 @@ export const updateAbout = async (
   req: Request,
   res: Response
 ) => {
-  try {
-    const { content } = req.body;
+  const validate = AboutSchema.safeParse(req.body);
 
+  if (!validate.success) {
+    return res.status(400).json({
+      message: validate.error.issues,
+    });
+  }
+  const { content } = validate.data;
+
+  try {
     await addAboutCacheJob({
       content: content,
     });
 
+    
     await sendInfoNotification(
       "About Updated",
       "About information was updated successfully."

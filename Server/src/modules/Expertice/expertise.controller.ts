@@ -8,105 +8,62 @@ import {
     getCacheVersion,
     incrementCacheVersion,
     ExpertiseCacheKeys,
+    uploadWithRetry,
+    getUploadedFile,
 } from "@utils";
+
 import {
     addCreateExpertiseJob,
     addUpdateExpertiseJob,
 } from "./Expertise.queue.ts";
+
 import { sendInfoNotification } from "@modules/Notification/Notification.service.ts";
+
 import type { IExpertice } from "./Expertise.types.ts";
-
-const toErrorMessage = (error: unknown): string => {
-    if (error instanceof Error) {
-        return error.message;
-    }
-
-    return String(error);
-};
-
-const getUploadedFile = (req: Request) => {
-    const files = req.files as
-        | {
-              file?: Express.Multer.File[];
-              image?: Express.Multer.File[];
-          }
-        | undefined;
-
-    return (
-        files?.image?.[0] ??
-        files?.file?.[0] ??
-        req.file ??
-        null
-    );
-};
-
-const signImage = async <T extends { image?: string }>(
-    expertise: T
-) => {
-    if (
-        expertise.image &&
-        typeof expertise.image === "string" &&
-        !expertise.image.startsWith("http")
-    ) {
-        try {
-            const signedUrl =
-                await Get_Signed_Url({
-                    key: expertise.image,
-                });
-
-            if (signedUrl) {
-                return {
-                    ...expertise,
-                    image: signedUrl,
-                };
-            }
-        } catch (error) {
-            console.error(
-                "Failed to sign expertise image:",
-                error
-            );
-        }
-    }
-
-    return expertise;
-};
+import { CreateExpertiseSchema, ExpertiseIdSchema, UpdateExpertiseSchema } from "./Expertise.validation.ts";
+import { ImageFileSchema } from "@utils";
 
 export const createExpertise = async (
     req: Request,
     res: Response
 ) => {
     try {
+        const validate = CreateExpertiseSchema.safeParse(req.body);
+
+        if (!validate.success) {
+            return res.status(400).json({
+                message: validate.error.issues,
+            });
+        }
         const {
             title,
             description,
-            linkTo,
-        } = req.body;
+        } = validate.data;
 
         const file = getUploadedFile(req);
 
-        if (!file) {
+        const validateFile = ImageFileSchema.safeParse(file);
+
+        if (!validateFile.success) {
             return res.status(400).json({
-                message: "Image file is required",
+                message: validateFile.error.issues,
             });
         }
 
         const uploadedFile =
-            await uploadFileToS3({
-                buffer: file.buffer,
-                fileName: file.originalname,
-                fileType: file.mimetype,
-                folderType: "Expertise",
-            });
+            await uploadWithRetry(
+                validateFile.data as Express.Multer.File,
+                3,
+                "Expertise"
+            );
 
         const data: IExpertice = {
             title,
             description,
             image: uploadedFile.key,
-            linkTo: linkTo || "#",
         };
 
-        const job =
-            await addCreateExpertiseJob(data);
+        const job = await addCreateExpertiseJob(data);
 
         await sendInfoNotification(
             "Expertise Creation",
@@ -120,7 +77,6 @@ export const createExpertise = async (
     } catch (error) {
         return res.status(500).json({
             message: "Internal server error",
-            error: toErrorMessage(error),
         });
     }
 };
@@ -130,15 +86,9 @@ export const getExpertise = async (
     res: Response
 ) => {
     try {
-        const page = Math.max(
-            Number(req.query.page) || 1,
-            1
-        );
+        const page = Number(req.query.page) || 1;
 
-        const limit = Math.max(
-            Number(req.query.limit) || 10,
-            1
-        );
+        const limit = Number(req.query.limit) || 10;
 
         const version =
             await getCacheVersion(
@@ -156,16 +106,17 @@ export const getExpertise = async (
             await getCache(cacheKey);
 
         if (cachedExpertise) {
-            return res.status(200).json(
-                cachedExpertise
-            );
+            return res.status(200).json({
+                data: cachedExpertise,
+                source: "cache",
+            });
         }
 
         const skip =
             (page - 1) * limit;
 
         const expertise =
-            await ExpertiseModel.find()
+            await ExpertiseModel.find({ isDeleted: false })
                 .sort({ createdAt: 1 })
                 .skip(skip)
                 .limit(limit)
@@ -174,7 +125,9 @@ export const getExpertise = async (
         const signedExpertise =
             await Promise.all(
                 expertise.map((item) =>
-                    signImage(item)
+                    item.image
+                        ? Get_Signed_Url({ key: item.image })
+                        : null
                 )
             );
 
@@ -184,12 +137,14 @@ export const getExpertise = async (
         );
 
         return res.status(200).json(
-            signedExpertise
+            {
+                data: signedExpertise,
+                source: "database",
+            }
         );
     } catch (error) {
         return res.status(500).json({
             message: "Internal server error",
-            error: toErrorMessage(error),
         });
     }
 };
@@ -199,8 +154,15 @@ export const getExpertiseById = async (
     res: Response
 ) => {
     try {
-        const { id } =
-            req.params as { id: string };
+
+        const validateId = ExpertiseIdSchema.safeParse(req.params);
+
+        if (!validateId.success) {
+            return res.status(400).json({
+                message: validateId.error.issues,
+            });
+        }
+        const { id } = validateId.data;
 
         const version =
             await getCacheVersion(
@@ -220,13 +182,13 @@ export const getExpertiseById = async (
 
         if (cachedExpertise) {
             return res.status(200).json(
-                cachedExpertise
+                { data: cachedExpertise, source: "cache" }
             );
         }
 
         const expertise =
             await ExpertiseModel
-                .findById(id)
+                .findOne({ _id: id, isDeleted: false })
                 .lean();
 
         if (!expertise) {
@@ -235,21 +197,24 @@ export const getExpertiseById = async (
             });
         }
 
-        const signedExpertise =
-            await signImage(expertise);
+        if (expertise.image) {
+            const signedImageUrl =
+                await Get_Signed_Url({ key: expertise.image });
+            expertise.image = signedImageUrl;
+        }
+
 
         await setCache(
             cacheKey,
-            signedExpertise
+            expertise
         );
 
         return res.status(200).json(
-            signedExpertise
+            { data: expertise, source: "database" }
         );
     } catch (error) {
         return res.status(500).json({
             message: "Internal server error",
-            error: toErrorMessage(error),
         });
     }
 };
@@ -259,74 +224,75 @@ export const updateExpertise = async (
     res: Response
 ) => {
     try {
-        const { id } =
-            req.params as { id: string };
+        const validateBody = UpdateExpertiseSchema.safeParse(req.body);
 
+        if (!validateBody.success) {
+            return res.status(400).json({
+                message: validateBody.error.issues,
+            });
+        }
         const {
             title,
             description,
-            linkTo,
-        } = req.body;
+        } = validateBody.data;
+
+        const validateId = ExpertiseIdSchema.safeParse(req.params);
+
+        if (!validateId.success) {
+            return res.status(400).json({
+                message: validateId.error.issues,
+            });
+        }
+        const { id } = validateId.data;
 
         const file = getUploadedFile(req);
 
-        const oldExpertise =
-            await ExpertiseModel.findById(id);
+        const validateFile = ImageFileSchema.safeParse(file);
 
-        if (!oldExpertise) {
+        if (!validateFile.success) {
+            return res.status(400).json({
+                message: validateFile.error.issues,
+            });
+        }
+
+        const Expertise =
+            await ExpertiseModel.findOne({ _id: id, isDeleted: false });
+
+        if (!Expertise) {
             return res.status(404).json({
                 message: "Expertise not found",
             });
         }
-
-        const updateData: Partial<IExpertice> =
-            {};
-
-        if (title !== undefined) {
-            updateData.title = title;
-        }
-
-        if (description !== undefined) {
-            updateData.description =
-                description;
-        }
-
-        if (linkTo !== undefined) {
-            updateData.linkTo = linkTo;
-        }
-
+        let image;
         if (file) {
-            const uploadedFile =
-                await uploadFileToS3({
-                    buffer: file.buffer,
-                    fileName: file.originalname,
-                    fileType: file.mimetype,
-                    folderType: "Expertise",
-                });
+            const uploadedFile = await uploadWithRetry(validateFile.data as Express.Multer.File, 3, "Expertise");
 
-            updateData.image =
+            image =
                 uploadedFile.key;
         }
 
         const job =
             await addUpdateExpertiseJob(
                 id,
-                updateData
+                {
+                    title: title ? title : Expertise.title,
+                    description: description ? description : Expertise.description,
+                    image: image ? image : Expertise.image,
+                }
             );
 
         await sendInfoNotification(
             "Expertise Update",
-            `Expertise "${oldExpertise.title}" was added to the update queue and is being processed.`
+            `Expertise "${Expertise.title}" was added to the update queue and is being processed.`
         );
 
         return res.status(202).json({
-            message: `Expertise "${oldExpertise.title}" was added to the update queue and is being processed.`,
+            message: `Expertise "${Expertise.title}" was added to the update queue and is being processed.`,
             jobId: job.id,
         });
     } catch (error) {
         return res.status(500).json({
             message: "Internal server error",
-            error: toErrorMessage(error),
         });
     }
 };
@@ -336,11 +302,16 @@ export const deleteExpertise = async (
     res: Response
 ) => {
     try {
-        const { id } =
-            req.params as { id: string };
+        const validateId = ExpertiseIdSchema.safeParse(req.params);
+        if (!validateId.success) {
+            return res.status(400).json({
+                message: validateId.error.issues,
+            });
+        }
+        const { id } = validateId.data;
 
         const expertise =
-            await ExpertiseModel.findById(id);
+            await ExpertiseModel.findOne({ _id: id, isDeleted: false });
 
         if (!expertise) {
             return res.status(404).json({
@@ -348,7 +319,13 @@ export const deleteExpertise = async (
             });
         }
 
-        await ExpertiseModel.findByIdAndDelete(id);
+        const deletedExpertise = await ExpertiseModel.findByIdAndUpdate({ _id: id }, { isDeleted: true });
+
+        if (!deletedExpertise) {
+            return res.status(404).json({
+                message: "Expertise not found",
+            });
+        }
 
         await incrementCacheVersion(
             ExpertiseCacheKeys.listVersion()
@@ -369,8 +346,7 @@ export const deleteExpertise = async (
         });
     } catch (error) {
         return res.status(500).json({
-            message: "Internal server error",
-            error: toErrorMessage(error),
+            message: "Internal server error"
         });
     }
 };

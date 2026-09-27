@@ -1,3 +1,4 @@
+import { ImageFileSchema } from "src/utils/Function.ts";
 import { z } from "zod";
 
 const booleanFromFormData = z.preprocess(
@@ -12,7 +13,7 @@ const booleanFromFormData = z.preprocess(
 
         return value;
     },
-    z.boolean().optional()
+    z.boolean()
 );
 
 const tagsFromFormData = z.preprocess(
@@ -38,7 +39,7 @@ const tagsFromFormData = z.preprocess(
 
         return value;
     },
-    z.array(z.string()).optional()
+    z.array(z.string())
 );
 
 export const CreateBlogSchema = z.object({
@@ -48,6 +49,7 @@ export const CreateBlogSchema = z.object({
     content: z.string().min(1, "Content is required"),
     tags: tagsFromFormData,
     isPublished: booleanFromFormData,
+    
 });
 
 export const UpdateBlogSchema = z.object({

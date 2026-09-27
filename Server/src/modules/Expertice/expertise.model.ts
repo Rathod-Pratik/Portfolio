@@ -1,5 +1,5 @@
 import mongoose, { type HydratedDocument } from "mongoose";
-import type { IExpertice } from "@type";
+import type { IExpertice } from "./Expertise.types.ts";
 
 const expertiseSchema = new mongoose.Schema<IExpertice>(
   {
@@ -15,10 +15,10 @@ const expertiseSchema = new mongoose.Schema<IExpertice>(
       type: String,
       required: true,
     },
-    linkTo: {
-      type: String,
-      default: "#",
-    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    }
   },
   {
     timestamps: true,

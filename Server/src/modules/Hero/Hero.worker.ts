@@ -7,6 +7,7 @@ import {
     HERO_ID,
 } from "@utils";
 import type { IHeroJob } from "./Hero.types.ts";
+import { sendInfoNotification } from "@modules/Notification/Notification.index.ts";
 
 export const heroWorker =
     new Worker<IHeroJob>(
@@ -28,6 +29,11 @@ export const heroWorker =
 
             await incrementCacheVersion(
                 HeroCacheKeys.detailsVersion(HERO_ID)
+            );
+
+            await sendInfoNotification(
+                "Hero Update",
+                `Hero updated: ${hero.name}.`
             );
 
             return hero;

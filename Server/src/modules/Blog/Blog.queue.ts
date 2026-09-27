@@ -12,6 +12,7 @@ export interface IBlogCacheJob {
     image?: string;
     tags?: string[];
     isPublished?: boolean;
+    isDeleted?: boolean;
 }
 
 export const blogQueue = new Queue<IBlogCacheJob>(

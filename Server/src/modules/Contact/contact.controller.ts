@@ -13,18 +13,28 @@ import {
   sendInfoNotification,
   sendDangerNotification,
 } from "@modules/Notification/Notification.service.ts";
+import {ContactIdSchema, CreateContactSchema, UpdateContactStatusSchema} from "./Contact.validation.ts";
 
 export const createContact = async (
   req: Request,
   res: Response,
 ) => {
   try {
+    
+    const validate = CreateContactSchema.safeParse(req.body);
+
+    if(!validate.success){
+      return res.status(400).json({
+        message: validate.error.issues,
+      });
+    }
+
     const {
       name,
       email,
       mobile,
       message
-    } = req.body;
+    } = validate.data;
 
     await CreateContactJob({
       name,
@@ -45,7 +55,8 @@ export const createContact = async (
 
     return res.status(400).json({
       success: false,
-      message: error,
+      message: "Invalid request body",
+      error: error,
     });
   }
 };
@@ -74,15 +85,15 @@ export const GetContact = async (
 
     if (cachedContacts) {
       return res.status(200).json({
-        success: true,
         data: cachedContacts,
+        source: "cache",
       });
     }
 
     const skip = (page - 1) * limit;
 
     const contacts = await contactModel
-      .find()
+      .find({isDeleted:false})
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -97,6 +108,7 @@ export const GetContact = async (
     return res.status(200).json({
       success: true,
       data: contacts,
+      source: "database",
     });
   } catch (error) {
     return res.status(400).json({
@@ -111,7 +123,14 @@ export const UpdateContactStatus = async (
   res: Response
 ) => {
   try {
-    const { status, _id } = req.body;
+    const validate = UpdateContactStatusSchema.safeParse(req.body);
+    if (!validate.success) {
+      return res.status(400).json({
+        message: validate.error.issues,
+      });
+    }
+    
+    const { status, _id } = validate.data;
 
     const contact = await contactModel.findByIdAndUpdate(
       _id,
@@ -157,10 +176,20 @@ export const DeleteContact = async (
   res: Response
 ) => {
   try {
+
+    const validate = ContactIdSchema.safeParse(req.params);
+
+    if (!validate.success) {
+      return res.status(400).json({
+        message: "Invalid request params",
+        error: validate.error.issues,
+      });
+    }
+    
     const { _id } = req.params;
 
     const contact =
-      await contactModel.findByIdAndDelete(_id);
+      await contactModel.findByIdAndUpdate(_id,{isDeleted:true});
 
     if (!contact) {
       return res.status(404).json({
@@ -168,7 +197,6 @@ export const DeleteContact = async (
         message: "Contact not found",
       });
     }
-
    await incrementCacheVersion(
       ContactCacheKeys.listVersion()
     );

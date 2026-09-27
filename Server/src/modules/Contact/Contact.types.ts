@@ -12,4 +12,5 @@ export interface IContact {
     budget: string;
     status: ContactStatus;
     message: string;
+    isDeleted?: boolean;
 }

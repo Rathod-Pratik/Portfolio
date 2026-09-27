@@ -1,9 +1,10 @@
 export interface IExperience {
     year: string;
-    duration?: string;
+    duration: string;
     title: string;
     company: string;
     description: string;
+    isDeleted?: boolean;
 }
 
 export interface ICreateExperienceJob {

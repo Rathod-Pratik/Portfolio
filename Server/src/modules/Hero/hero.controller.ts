@@ -1,7 +1,6 @@
 import type { Request, Response } from "express";
 import { HeroModel } from "./Hero.model.ts";
 import {
-    uploadFileToS3,
     getCache,
     setCache,
     getCacheVersion,
@@ -9,35 +8,15 @@ import {
     HERO_ID,
     getUploadedFile,
     Get_Signed_Url,
+    uploadWithRetry,
+    ImageFileSchema
 } from "@utils";
 import { addUpdateHeroJob } from "./Hero.queue.ts";
 import { sendInfoNotification } from "@modules/Notification/Notification.service.ts";
-import type { IHero } from "./Hero.types.ts";
-
-const signHeroImage = async <T extends { image?: string }>(
-    hero: T
-) => {
-    if (
-        hero.image &&
-        !hero.image.startsWith("http")
-    ) {
-        const signedUrl = await Get_Signed_Url({
-            key: hero.image,
-        });
-
-        if (signedUrl) {
-            return {
-                ...hero,
-                image: signedUrl,
-            };
-        }
-    }
-
-    return hero;
-};
+import { UpdateHeroSchema } from "./Hero.validation.ts";
 
 export const getHero = async (
-    _req: Request,
+    req: Request,
     res: Response
 ) => {
     try {
@@ -71,17 +50,20 @@ export const getHero = async (
             });
         }
 
-        const signedHero =
-            await signHeroImage(hero);
+        if (hero.image) {
+            hero.image = await Get_Signed_Url({
+                key: hero.image,
+            });
+        }
 
         await setCache(
             cacheKey,
-            signedHero,
+            hero,
             60 * 60 * 24
         );
 
         return res.status(200).json({
-            data: signedHero,
+            data: hero,
             source: "database",
         });
     } catch (error) {
@@ -96,49 +78,52 @@ export const updateHero = async (
     res: Response
 ) => {
     try {
+        const validate = UpdateHeroSchema.safeParse(req.body);
+        if (!validate.success) {
+            return res.status(400).json({
+                message: validate.error.issues,
+            });
+        }
         const {
             greeting,
             name,
             roles,
             description,
-        } = req.body;
-
-        const updateData: Partial<IHero> = {};
-
-        if (greeting !== undefined) {
-            updateData.greeting = greeting;
-        }
-
-        if (name !== undefined) {
-            updateData.name = name;
-        }
-
-        if (roles !== undefined) {
-            updateData.roles = roles;
-        }
-
-        if (description !== undefined) {
-            updateData.description =
-                description;
-        }
+        } = validate.data;
 
         const file = getUploadedFile(req);
+        const validateFile = ImageFileSchema.safeParse(file);
 
+        if (!validateFile.success) {
+            return res.status(400).json({
+                message: validateFile.error.issues,
+            });
+        }
+
+        const hero = await HeroModel.findOne().lean();
+
+        if (!hero) {
+            return res.status(404).json({
+                message: "Hero not found",
+            });
+        }
+
+        let image;
         if (file) {
             const uploadedFile =
-                await uploadFileToS3({
-                    buffer: file.buffer,
-                    fileName: file.originalname,
-                    fileType: file.mimetype,
-                    folderType: "Hero",
-                });
+                await uploadWithRetry(validateFile.data as Express.Multer.File, 3, "Hero");
 
-            updateData.image =
-                uploadedFile.key;
+            image = uploadedFile.key;
         }
 
         const job =
-            await addUpdateHeroJob(updateData);
+            await addUpdateHeroJob({
+                greeting: greeting ? greeting : hero.greeting,
+                name: name ? name : hero.name,
+                roles: roles ? roles : hero.roles,
+                description: description ? description : hero.description,
+                image: image ? image : hero.image,
+            });
 
         await sendInfoNotification(
             "Hero Update",

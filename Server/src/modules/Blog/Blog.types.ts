@@ -7,4 +7,5 @@ export interface IBlog {
     tags: string[];
     author: string;
     isPublished: boolean;
+    isDeleted?: boolean;
 }

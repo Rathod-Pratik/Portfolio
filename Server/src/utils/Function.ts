@@ -140,6 +140,20 @@ export const getUploadedFile = (req: Request): Express.Multer.File => {
   return file;
 }
 
+export const getFiles = (req: Request) => {
+  const files = req.files as
+    {
+      file?: Express.Multer.File[];
+      image?: Express.Multer.File[];
+    }
+    ;
+
+  return {
+    image: files.image?.[0],
+    pdf: files.file?.[0],
+  };
+};
+
 export const getMultipleUploadedFiles = (req: Request): Express.Multer.File[] => {
   const files = req.files as Express.Multer.File[];
   return files;
@@ -180,3 +194,59 @@ export const uploadWithRetry = async (
 
   throw lastError;
 };
+
+import { z } from "zod";
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_PDF_SIZE = 10 * 1024 * 1024;
+
+const allowedImageTypes = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+
+export const ImageFileSchema = z.object({
+  buffer: z.instanceof(Buffer, {
+    message: "Image is required",
+  }),
+
+  mimetype: z
+    .string()
+    .refine(
+      (type) => allowedImageTypes.includes(type),
+      {
+        message:
+          "Only JPEG, PNG, and WEBP images are allowed",
+      }
+    ),
+
+  size: z
+    .number()
+    .max(
+      MAX_IMAGE_SIZE,
+      "Image size must be less than 5MB"
+    ),
+});
+
+export const PdfFileSchema = z.object({
+  buffer: z.instanceof(Buffer, {
+    message: "PDF is required",
+  }),
+
+  mimetype: z
+    .string()
+    .refine(
+      (type) => type === "application/pdf",
+      {
+        message: "Only PDF files are allowed",
+      }
+    ),
+
+  size: z
+    .number()
+    .max(
+      MAX_PDF_SIZE,
+      "PDF size must be less than 10MB"
+    ),
+});

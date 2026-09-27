@@ -6,7 +6,7 @@ const aboutSchema = new mongoose.Schema<IAbout>(
     content: {
       type: String,
       required: true
-    },
+    }
   },
   {
     timestamps: true,
