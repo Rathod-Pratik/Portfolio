@@ -1,20 +1,24 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { ResumeCacheKeys, incrementCacheVersion } from "@utils";
+import { ResumeCacheKeys, incrementCacheVersion, logger } from "@utils";
 import { CVmodel } from "./Resume.model.ts";
 import type { IResumeJob } from "./Resume.types.ts";
-
 
 export const resumeWorker = new Worker<IResumeJob>(
     "resume",
     async (job) => {
         switch (job.data.type) {
             case "create": {
-                await CVmodel.create(job.data.data);
+                const cv = await CVmodel.create(job.data.data);
 
                 await incrementCacheVersion(
                     ResumeCacheKeys.listVersion()
                 );
+
+                await logger.info(`CV created in DB with ID: ${cv._id.toString()}`, {
+                    context: "ResumeWorker",
+                    metadata: { cvId: cv._id.toString(), jobId: job.id },
+                });
 
                 return;
             }
@@ -30,6 +34,7 @@ export const resumeWorker = new Worker<IResumeJob>(
                     );
 
                 if (!updatedResume) {
+                    await logger.warn(`Resume worker update failed: ID not found: ${job.data.resumeId}`, { context: "ResumeWorker" });
                     throw new Error("Resume not found");
                 }
 
@@ -42,6 +47,11 @@ export const resumeWorker = new Worker<IResumeJob>(
                         job.data.resumeId
                     )
                 );
+
+                await logger.info(`CV updated in DB for ID: ${job.data.resumeId}`, {
+                    context: "ResumeWorker",
+                    metadata: { cvId: job.data.resumeId, jobId: job.id },
+                });
 
                 return;
             }
@@ -56,12 +66,12 @@ export const resumeWorker = new Worker<IResumeJob>(
 );
 
 resumeWorker.on("completed", (job) => {
-    console.log(`Resume job completed: ${job.id}`);
+    logger.info(`Resume job completed: ${job.id}`, { context: "ResumeWorker", metadata: { jobId: job.id } });
 });
 
 resumeWorker.on("failed", (job, error) => {
-    console.error(
+    logger.error(
         `Resume job failed: ${job?.id}`,
-        error
+        error instanceof Error ? error : { context: "ResumeWorker", metadata: { jobId: job?.id, error: String(error) } }
     );
-});
+});

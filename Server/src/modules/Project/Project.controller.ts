@@ -1,5 +1,5 @@
 import { Project } from './Project.model.ts';
-import { Get_Signed_Url, getUploadedFile, uploadFileToS3 } from '@utils';
+import { Get_Signed_Url, getUploadedFile, uploadFileToS3, logger, incrementCacheVersion, ProjectCacheKeys } from '@utils';
 import type { Request, Response } from 'express';
 import { CreateProjectSchema, EditProjectSchema } from './Project.validation.ts';
 import { addCreateProjectJob, addUpdateProjectJob } from './Project.queue.ts';
@@ -12,6 +12,10 @@ export const CreateProject = async (
   const validation = CreateProjectSchema.safeParse(req.body);
 
   if (!validation.success) {
+    await logger.warn("Create project validation failed", {
+      context: "ProjectController",
+      metadata: { errors: validation.error.flatten().fieldErrors },
+    });
     return res.status(400).json({
       success: false,
       message: 'Validation failed',
@@ -46,9 +50,18 @@ export const CreateProject = async (
       `Project "${title}" was added to the queue and is being processed.`,
     );
 
+    await logger.info(`Project creation queued: ${title}`, {
+      context: "ProjectController",
+      metadata: { jobId: job.id, title },
+    });
+
     return res.status(200).json({ success: true, message: 'Project created successfully', jobId: job.id });
   } catch (error) {
-    return res.status(400).json({
+    await logger.error(
+      "Create project error",
+      error instanceof Error ? error : { context: "ProjectController", metadata: { error: String(error) } }
+    );
+    return res.status(500).json({
       success: false,
       message: 'Something went wrong',
     });
@@ -63,24 +76,35 @@ export const DeleteProject = async (
     const { _id } = req.params;
 
     if (!_id) {
-      return res.status(200).send("_id is required");
+      await logger.warn("Delete project missing _id param", { context: "ProjectController" });
+      return res.status(400).json({ success: false, message: "_id is required" });
     }
     const projectData = await Project.findById(_id);
     if (!projectData) {
-      return res.status(400).send("Project not found");
+      await logger.warn(`Delete project: Not found for ID: ${_id}`, { context: "ProjectController" });
+      return res.status(404).json({ success: false, message: "Project not found" });
     }
 
     const project = await Project.findByIdAndDelete(_id);
 
     if (project) {
+      await incrementCacheVersion(ProjectCacheKeys.listVersion());
+      await incrementCacheVersion(ProjectCacheKeys.detailsVersion(_id as string));
+      await logger.info(`Project deleted successfully: ${projectData.title} (ID: ${_id})`, { context: "ProjectController" });
       return res
         .status(200)
-        .send({ success: true, message: "Project Deleted successfully" });
+        .json({ success: true, message: "Project Deleted successfully" });
     }
+
+    return res.status(404).json({ success: false, message: "Project not found" });
   } catch (error) {
-    return res.status(400).json({
+    await logger.error(
+      "Delete project error",
+      error instanceof Error ? error : { context: "ProjectController", metadata: { error: String(error) } }
+    );
+    return res.status(500).json({
       success: false,
-      message: 'Some error is occured',
+      message: 'Some error occurred',
     });
   }
 };
@@ -97,6 +121,7 @@ export const GetProject = async (req: Request, res: Response) => {
     const project = await Project.find().limit(limit).skip((page - 1) * limit);
 
     if (!project) {
+      await logger.warn("No projects found in database", { context: "ProjectController" });
       return res.status(404).json({
         success: false,
         message: "No projects found",
@@ -112,12 +137,18 @@ export const GetProject = async (req: Request, res: Response) => {
         return item;
       })
     );
+
+    await logger.info(`Fetched ${signedProjects.length} projects from database`, { context: "ProjectController" });
     return res.status(200).json({ success: true, data: signedProjects });
 
   } catch (error) {
-    return res.status(400).json({
+    await logger.error(
+      "GetProject error",
+      error instanceof Error ? error : { context: "ProjectController", metadata: { error: String(error) } }
+    );
+    return res.status(500).json({
       success: false,
-      message: 'Some error is occured',
+      message: 'Some error occurred',
     });
   }
 };
@@ -129,6 +160,10 @@ export const EditProject = async (
   const validation = EditProjectSchema.safeParse(req.body);
 
   if (!validation.success) {
+    await logger.warn("Edit project validation failed", {
+      context: "ProjectController",
+      metadata: { errors: validation.error.flatten().fieldErrors },
+    });
     return res.status(400).json({
       success: false,
       message: 'Validation failed',
@@ -146,7 +181,8 @@ export const EditProject = async (
     const file = getUploadedFile(req);
 
     if (!_id) {
-      return res.status(400).send("_id is required");
+      await logger.warn("Edit project missing _id", { context: "ProjectController" });
+      return res.status(400).json({ success: false, message: "_id is required" });
     }
 
     const EditData: Record<string, string> = {};
@@ -168,6 +204,11 @@ export const EditProject = async (
 
     const job = await addUpdateProjectJob(_id, EditData);
 
+    await logger.info(`Project update queued for ID: ${_id}`, {
+      context: "ProjectController",
+      metadata: { jobId: job.id, projectId: _id },
+    });
+
     return res.status(202).json({
       success: true,
       message: "Project update job added successfully",
@@ -175,7 +216,11 @@ export const EditProject = async (
     });
 
   } catch (error) {
-    return res.status(400).json({
+    await logger.error(
+      "Edit project error",
+      error instanceof Error ? error : { context: "ProjectController", metadata: { error: String(error) } }
+    );
+    return res.status(500).json({
       success: false,
       message: "Something went wrong",
     });
@@ -190,21 +235,28 @@ export const GetProjectData = async (
     const { _id } = req.params;
 
     if (!_id) {
-      return res.status(400).send("_id is required")
+      await logger.warn("GetProjectData missing _id param", { context: "ProjectController" });
+      return res.status(400).json({ success: false, message: "_id is required" });
     }
 
     let projectData = await Project.findById(_id);
     if (!projectData) {
-      return res.status(404).send("Project not found")
+      await logger.warn(`GetProjectData: Not found for ID: ${_id}`, { context: "ProjectController" });
+      return res.status(404).json({ success: false, message: "Project not found" });
     }
 
     if (projectData.image) {
       projectData.image = await Get_Signed_Url({ key: projectData.image });
     }
 
-    return res.status(200).json({ data: projectData, success: true })
+    await logger.info(`Fetched project details for ID: ${_id}`, { context: "ProjectController" });
+
+    return res.status(200).json({ data: projectData, success: true });
   } catch (error) {
-    console.log(error)
-    return res.status(400).send("Some error is occured")
+    await logger.error(
+      "GetProjectData error",
+      error instanceof Error ? error : { context: "ProjectController", metadata: { error: String(error) } }
+    );
+    return res.status(500).json({ success: false, message: "Some error occurred" });
   }
-}
+};

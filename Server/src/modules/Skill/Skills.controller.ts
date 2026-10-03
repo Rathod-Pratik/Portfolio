@@ -3,22 +3,22 @@ import type { Request, Response } from "express";
 import {
     CreateSkillSchema,
     EditSkillSchema,
-} from "./Skills.validation.ts";
+} from "./Skill.validation.ts";
 import {
     addCreateSkillJob,
     addUpdateSkillJob,
-} from "./Skills.queue.ts";
+} from "./Skill.queue.ts";
 import {
     getCache,
     setCache,
     SkillCacheKeys,
     getCacheVersion,
     incrementCacheVersion,
+    logger,
 } from "@utils";
 import {
     sendInfoNotification,
 } from "../Notification/Notification.service.ts";
-
 
 export const CreateSkill = async (
     req: Request,
@@ -27,6 +27,10 @@ export const CreateSkill = async (
     const validation = CreateSkillSchema.safeParse(req.body);
 
     if (!validation.success) {
+        await logger.warn("Create skill validation failed", {
+            context: "SkillController",
+            metadata: { errors: validation.error.flatten().fieldErrors },
+        });
         return res.status(400).json({
             success: false,
             message: "Validation failed",
@@ -44,13 +48,22 @@ export const CreateSkill = async (
             `Skill "${validation.data.language}" has been added to the creation queue.`
         );
 
+        await logger.info(`Skill creation queued: ${validation.data.language}`, {
+            context: "SkillController",
+            metadata: { jobId: job.id, skill: validation.data.language },
+        });
+
         return res.status(202).json({
             success: true,
             message: "Skill creation job added successfully",
             jobId: job.id,
         });
     } catch (error) {
-        return res.status(400).json({
+        await logger.error(
+            "Create skill error",
+            error instanceof Error ? error : { context: "SkillController", metadata: { error: String(error) } }
+        );
+        return res.status(500).json({
             success: false,
             message: "Something went wrong",
         });
@@ -64,6 +77,10 @@ export const EditSkill = async (
     const validation = EditSkillSchema.safeParse(req.body);
 
     if (!validation.success) {
+        await logger.warn("Edit skill validation failed", {
+            context: "SkillController",
+            metadata: { errors: validation.error.flatten().fieldErrors },
+        });
         return res.status(400).json({
             success: false,
             message: "Validation failed",
@@ -83,6 +100,7 @@ export const EditSkill = async (
             await SkillsModel.findById(_id);
 
         if (!existingSkill) {
+            await logger.warn(`Edit skill: Skill not found with ID: ${_id}`, { context: "SkillController" });
             return res.status(404).json({
                 success: false,
                 message: "Skill not found",
@@ -97,7 +115,6 @@ export const EditSkill = async (
 
         if (percentage) updateData.percentage = percentage;
 
-
         const job = await addUpdateSkillJob(
             _id,
             updateData
@@ -108,13 +125,22 @@ export const EditSkill = async (
             `Skill "${existingSkill.language}" has been added to the update queue.`
         );
 
+        await logger.info(`Skill update queued for ID: ${_id}`, {
+            context: "SkillController",
+            metadata: { jobId: job.id, skillId: _id },
+        });
+
         return res.status(202).json({
             success: true,
             message: "Skill update job added successfully",
             jobId: job.id,
         });
     } catch (error) {
-        return res.status(400).json({
+        await logger.error(
+            "Edit skill error",
+            error instanceof Error ? error : { context: "SkillController", metadata: { error: String(error) } }
+        );
+        return res.status(500).json({
             success: false,
             message: "Something went wrong",
         });
@@ -129,6 +155,7 @@ export const DeleteSkill = async (
         const { _id } = req.params;
 
         if (!_id) {
+            await logger.warn("Delete skill missing _id param", { context: "SkillController" });
             return res.status(400).json({
                 success: false,
                 message: "_id is required",
@@ -139,6 +166,7 @@ export const DeleteSkill = async (
             await SkillsModel.findByIdAndDelete(_id);
 
         if (!skill) {
+            await logger.warn(`Delete skill: Not found for ID: ${_id}`, { context: "SkillController" });
             return res.status(404).json({
                 success: false,
                 message: "Skill not found",
@@ -153,12 +181,18 @@ export const DeleteSkill = async (
             SkillCacheKeys.detailsVersion(_id as string)
         );
 
+        await logger.info(`Skill deleted successfully: ${skill.language} (ID: ${_id})`, { context: "SkillController" });
+
         return res.status(200).json({
             success: true,
             message: "Skill deleted successfully",
         });
     } catch (error) {
-        return res.status(400).json({
+        await logger.error(
+            "Delete skill error",
+            error instanceof Error ? error : { context: "SkillController", metadata: { error: String(error) } }
+        );
+        return res.status(500).json({
             success: false,
             message: "Something went wrong",
         });
@@ -199,6 +233,7 @@ export const GetSkill = async (
             await getCache(cacheKey);
 
         if (cachedSkills !== null) {
+            await logger.debug("Fetched skills from cache", { context: "SkillController" });
             return res.status(200).json({
                 success: true,
                 data: cachedSkills,
@@ -214,12 +249,18 @@ export const GetSkill = async (
             skills
         );
 
+        await logger.info(`Fetched ${skills.length} skills from database`, { context: "SkillController" });
+
         return res.status(200).json({
             success: true,
             data: skills,
         });
     } catch (error) {
-        return res.status(400).json({
+        await logger.error(
+            "GetSkill error",
+            error instanceof Error ? error : { context: "SkillController", metadata: { error: String(error) } }
+        );
+        return res.status(500).json({
             success: false,
             message: "Something went wrong",
         });

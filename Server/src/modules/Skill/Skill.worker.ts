@@ -3,21 +3,26 @@ import { bellmqConnection } from "@config/redis.ts";
 import {
     SkillCacheKeys,
     incrementCacheVersion,
+    logger,
 } from "@utils";
 import { SkillsModel } from "./Skills.model.ts";
-import type { ISkillJob } from "./Skills.types.ts";
-
+import type { ISkillJob } from "./Skill.types.ts";
 
 export const skillWorker = new Worker<ISkillJob>(
     "skill",
     async (job) => {
         switch (job.data.type) {
             case "create": {
-                await SkillsModel.create(job.data.data);
+                const skill = await SkillsModel.create(job.data.data);
 
                 await incrementCacheVersion(
                     SkillCacheKeys.listVersion()
                 );
+
+                await logger.info(`Skill created in DB: ${skill.language}`, {
+                    context: "SkillWorker",
+                    metadata: { skillId: skill._id.toString(), jobId: job.id },
+                });
 
                 return;
             }
@@ -33,6 +38,7 @@ export const skillWorker = new Worker<ISkillJob>(
                     );
 
                 if (!updatedSkill) {
+                    await logger.warn(`Skill worker update failed: ID not found: ${job.data.skillId}`, { context: "SkillWorker" });
                     throw new Error("Skill not found");
                 }
 
@@ -45,6 +51,11 @@ export const skillWorker = new Worker<ISkillJob>(
                         job.data.skillId
                     )
                 );
+
+                await logger.info(`Skill updated in DB for ID: ${job.data.skillId}`, {
+                    context: "SkillWorker",
+                    metadata: { skillId: job.data.skillId, jobId: job.id },
+                });
 
                 return;
             }
@@ -59,12 +70,12 @@ export const skillWorker = new Worker<ISkillJob>(
 );
 
 skillWorker.on("completed", (job) => {
-    console.log(`Skill job completed: ${job.id}`);
+    logger.info(`Skill job completed: ${job.id}`, { context: "SkillWorker", metadata: { jobId: job.id } });
 });
 
 skillWorker.on("failed", (job, error) => {
-    console.error(
+    logger.error(
         `Skill job failed: ${job?.id}`,
-        error
+        error instanceof Error ? error : { context: "SkillWorker", metadata: { jobId: job?.id, error: String(error) } }
     );
 });

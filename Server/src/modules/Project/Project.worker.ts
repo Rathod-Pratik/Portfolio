@@ -1,33 +1,41 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { ProjectCacheKeys, incrementCacheVersion } from "@utils";
+import { ProjectCacheKeys, incrementCacheVersion, logger } from "@utils";
 import { Project } from "./Project.model.ts";
 import type { IProjectJob } from "./Project.types.ts";
-
-
 
 export const projectWorker = new Worker<IProjectJob>(
     "project",
     async (job) => {
         switch (job.data.type) {
             case "create": {
-                await Project.create(job.data.data);
+                const project = await Project.create(job.data.data);
 
                 await incrementCacheVersion(
                     ProjectCacheKeys.listVersion()
                 );
 
+                await logger.info(`Project created in DB: ${project.title}`, {
+                    context: "ProjectWorker",
+                    metadata: { projectId: project._id.toString(), jobId: job.id },
+                });
+
                 return;
             }
 
             case "update": {
-                await Project.findByIdAndUpdate(
+                const project = await Project.findByIdAndUpdate(
                     job.data.projectId,
                     job.data.data,
                     {
                         new: true,
                     }
                 );
+
+                if (!project) {
+                    await logger.warn(`Project worker update failed: ID not found: ${job.data.projectId}`, { context: "ProjectWorker" });
+                    throw new Error("Project not found");
+                }
 
                 await incrementCacheVersion(
                     ProjectCacheKeys.listVersion()
@@ -36,6 +44,11 @@ export const projectWorker = new Worker<IProjectJob>(
                 await incrementCacheVersion(
                     ProjectCacheKeys.detailsVersion(job.data.projectId)
                 );
+
+                await logger.info(`Project updated in DB for ID: ${job.data.projectId}`, {
+                    context: "ProjectWorker",
+                    metadata: { projectId: job.data.projectId, jobId: job.id },
+                });
 
                 return;
             }
@@ -50,12 +63,12 @@ export const projectWorker = new Worker<IProjectJob>(
 );
 
 projectWorker.on("completed", (job) => {
-    console.log(`Project job completed: ${job.id}`);
+    logger.info(`Project job completed: ${job.id}`, { context: "ProjectWorker", metadata: { jobId: job.id } });
 });
 
 projectWorker.on("failed", (job, error) => {
-    console.error(
+    logger.error(
         `Project job failed: ${job?.id}`,
-        error
+        error instanceof Error ? error : { context: "ProjectWorker", metadata: { jobId: job?.id, error: String(error) } }
     );
-});
+});

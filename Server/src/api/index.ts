@@ -13,15 +13,14 @@ import ProjectRoutes from '@modules/Project/Project.route.ts';
 import SkillsRoutes from '@modules/Skill/Skill.route.ts';
 import AuthRoutes from '@modules/Auth/Auth.route.ts';
 import CVRoutes from '@modules/Resume/Resume.route.ts';
-import AwsRoutes from '@modules/Aws/Aws.route.ts';
-import BlogRoutes from '@modules/Blog/Blog.route.ts';
+import BlogRoutes from '@modules/Blog/Blog.routes.ts';
 import StateRoutes from '@modules/Stats/States.routes.ts';
 import ExperienceRoutes from '@modules/Experience/Experience.route.ts';
 import HeroRoutes from '@modules/Hero/Hero.route.ts';
 import ExpertiseRoutes from '@modules/Expertice/Expertise.route.ts';
 import AboutRoutes from '@modules/About/About.routes.ts';
-import BudgetRoutes from '@modules/Budget/budget.route.ts';
-import ProjectTypeRoutes from '@modules/ProjectType/projectType.route.ts';
+import LoggerRoutes from '@modules/Logger/Logger.routes.ts';
+
 
 import cookieParser from "cookie-parser";
 
@@ -62,7 +61,6 @@ app.use("/contact", contactroutes);
 app.use("/note", NoteRoutes);
 app.use("/auth", AuthRoutes);
 app.use("/CV", CVRoutes);
-app.use("/s3", AwsRoutes);
 app.use("/project", ProjectRoutes);
 app.use("/skills", SkillsRoutes);
 app.use("/blogs", BlogRoutes);
@@ -71,8 +69,7 @@ app.use("/experiences", ExperienceRoutes);
 app.use("/hero", HeroRoutes);
 app.use("/expertise", ExpertiseRoutes);
 app.use("/about", AboutRoutes);
-app.use("/budget", BudgetRoutes);
-app.use("/project-type", ProjectTypeRoutes);
+app.use("/logger", LoggerRoutes);
 
 app.get("/auth/check", (req, res) => {
   const token = req.cookies.admin;

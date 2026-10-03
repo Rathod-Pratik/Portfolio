@@ -4,6 +4,7 @@ import { ExperienceModel } from "./Experience.model.ts";
 import {
     incrementCacheVersion,
     ExperienceCacheKeys,
+    logger,
 } from "@utils";
 import type { IExperienceJob } from "./Experience.types.ts";
 import { sendInfoNotification } from "@modules/Notification/Notification.service.ts";
@@ -24,6 +25,12 @@ export const experienceWorker = new Worker<IExperienceJob>(
                 "Experience Creation",
                 `New experience created: ${experience.title}.`
             );
+
+            await logger.info(`Experience created in DB: ${experience.title}`, {
+                context: "ExperienceWorker",
+                metadata: { experienceId: experience._id.toString(), jobId: job.id },
+            });
+
             return experience;
         }
 
@@ -40,6 +47,7 @@ export const experienceWorker = new Worker<IExperienceJob>(
             );
 
         if (!experience) {
+            await logger.warn(`Experience worker update failed: ID not found: ${experienceId}`, { context: "ExperienceWorker" });
             throw new Error("Experience not found");
         }
 
@@ -58,6 +66,11 @@ export const experienceWorker = new Worker<IExperienceJob>(
             `Experience updated: ${experience.title}.`
         );
 
+        await logger.info(`Experience updated in DB for ID: ${experienceId}`, {
+            context: "ExperienceWorker",
+            metadata: { experienceId, jobId: job.id },
+        });
+
         return experience;
     },
     {
@@ -69,18 +82,16 @@ export const experienceWorker = new Worker<IExperienceJob>(
 experienceWorker.on(
     "completed",
     (job) => {
-        console.log(
-            `Experience job completed: ${job.id}`
-        );
+        logger.info(`Experience job completed: ${job.id}`, { context: "ExperienceWorker", metadata: { jobId: job.id } });
     }
 );
 
 experienceWorker.on(
     "failed",
     (job, error) => {
-        console.error(
+        logger.error(
             `Experience job failed: ${job?.id}`,
-            error
+            error instanceof Error ? error : { context: "ExperienceWorker", metadata: { jobId: job?.id, error: String(error) } }
         );
     }
 );
@@ -88,9 +99,9 @@ experienceWorker.on(
 experienceWorker.on(
     "error",
     (error) => {
-        console.error(
-            "Experience worker error:",
-            error
+        logger.error(
+            "Experience worker error",
+            error instanceof Error ? error : { context: "ExperienceWorker", metadata: { error: String(error) } }
         );
     }
-);
+);

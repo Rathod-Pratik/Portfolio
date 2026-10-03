@@ -10,6 +10,7 @@ import {
     ExpertiseCacheKeys,
     uploadWithRetry,
     getUploadedFile,
+    logger,
 } from "@utils";
 
 import {
@@ -31,6 +32,10 @@ export const createExpertise = async (
         const validate = CreateExpertiseSchema.safeParse(req.body);
 
         if (!validate.success) {
+            await logger.warn("Create expertise validation failed", {
+                context: "ExpertiseController",
+                metadata: { errors: validate.error.issues },
+            });
             return res.status(400).json({
                 message: validate.error.issues,
             });
@@ -45,6 +50,10 @@ export const createExpertise = async (
         const validateFile = ImageFileSchema.safeParse(file);
 
         if (!validateFile.success) {
+            await logger.warn("Create expertise image validation failed", {
+                context: "ExpertiseController",
+                metadata: { errors: validateFile.error.issues },
+            });
             return res.status(400).json({
                 message: validateFile.error.issues,
             });
@@ -70,11 +79,20 @@ export const createExpertise = async (
             `Expertise "${title}" was added to the creation queue and is being processed.`
         );
 
+        await logger.info(`Expertise creation queued: ${title}`, {
+            context: "ExpertiseController",
+            metadata: { jobId: job.id, title },
+        });
+
         return res.status(202).json({
             message: `Expertise "${title}" was added to the creation queue and is being processed.`,
             jobId: job.id,
         });
     } catch (error) {
+        await logger.error(
+            "Create expertise error",
+            error instanceof Error ? error : { context: "ExpertiseController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             message: "Internal server error",
         });
@@ -106,6 +124,7 @@ export const getExpertise = async (
             await getCache(cacheKey);
 
         if (cachedExpertise) {
+            await logger.debug("Fetched expertise list from cache", { context: "ExpertiseController" });
             return res.status(200).json({
                 data: cachedExpertise,
                 source: "cache",
@@ -136,6 +155,8 @@ export const getExpertise = async (
             signedExpertise
         );
 
+        await logger.info(`Fetched ${expertise.length} expertise from database`, { context: "ExpertiseController" });
+
         return res.status(200).json(
             {
                 data: signedExpertise,
@@ -143,6 +164,10 @@ export const getExpertise = async (
             }
         );
     } catch (error) {
+        await logger.error(
+            "Get expertise error",
+            error instanceof Error ? error : { context: "ExpertiseController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             message: "Internal server error",
         });
@@ -154,10 +179,13 @@ export const getExpertiseById = async (
     res: Response
 ) => {
     try {
-
         const validateId = ExpertiseIdSchema.safeParse(req.params);
 
         if (!validateId.success) {
+            await logger.warn("Get expertise by ID validation failed", {
+                context: "ExpertiseController",
+                metadata: { errors: validateId.error.issues },
+            });
             return res.status(400).json({
                 message: validateId.error.issues,
             });
@@ -181,6 +209,7 @@ export const getExpertiseById = async (
             await getCache(cacheKey);
 
         if (cachedExpertise) {
+            await logger.debug(`Fetched expertise from cache for ID: ${id}`, { context: "ExpertiseController" });
             return res.status(200).json(
                 { data: cachedExpertise, source: "cache" }
             );
@@ -192,6 +221,7 @@ export const getExpertiseById = async (
                 .lean();
 
         if (!expertise) {
+            await logger.warn(`Expertise not found with ID: ${id}`, { context: "ExpertiseController" });
             return res.status(404).json({
                 message: "Expertise not found",
             });
@@ -203,16 +233,21 @@ export const getExpertiseById = async (
             expertise.image = signedImageUrl;
         }
 
-
         await setCache(
             cacheKey,
             expertise
         );
 
+        await logger.info(`Fetched expertise from database for ID: ${id}`, { context: "ExpertiseController" });
+
         return res.status(200).json(
             { data: expertise, source: "database" }
         );
     } catch (error) {
+        await logger.error(
+            "Get expertise by ID error",
+            error instanceof Error ? error : { context: "ExpertiseController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             message: "Internal server error",
         });
@@ -227,6 +262,10 @@ export const updateExpertise = async (
         const validateBody = UpdateExpertiseSchema.safeParse(req.body);
 
         if (!validateBody.success) {
+            await logger.warn("Update expertise validation failed", {
+                context: "ExpertiseController",
+                metadata: { errors: validateBody.error.issues },
+            });
             return res.status(400).json({
                 message: validateBody.error.issues,
             });
@@ -239,6 +278,10 @@ export const updateExpertise = async (
         const validateId = ExpertiseIdSchema.safeParse(req.params);
 
         if (!validateId.success) {
+            await logger.warn("Update expertise invalid ID param", {
+                context: "ExpertiseController",
+                metadata: { errors: validateId.error.issues },
+            });
             return res.status(400).json({
                 message: validateId.error.issues,
             });
@@ -250,6 +293,10 @@ export const updateExpertise = async (
         const validateFile = ImageFileSchema.safeParse(file);
 
         if (!validateFile.success) {
+            await logger.warn("Update expertise invalid image file", {
+                context: "ExpertiseController",
+                metadata: { errors: validateFile.error.issues },
+            });
             return res.status(400).json({
                 message: validateFile.error.issues,
             });
@@ -259,6 +306,7 @@ export const updateExpertise = async (
             await ExpertiseModel.findOne({ _id: id, isDeleted: false });
 
         if (!Expertise) {
+            await logger.warn(`Update expertise: Not found for ID: ${id}`, { context: "ExpertiseController" });
             return res.status(404).json({
                 message: "Expertise not found",
             });
@@ -286,11 +334,20 @@ export const updateExpertise = async (
             `Expertise "${Expertise.title}" was added to the update queue and is being processed.`
         );
 
+        await logger.info(`Expertise update queued for ID: ${id}`, {
+            context: "ExpertiseController",
+            metadata: { jobId: job.id, expertiseId: id },
+        });
+
         return res.status(202).json({
             message: `Expertise "${Expertise.title}" was added to the update queue and is being processed.`,
             jobId: job.id,
         });
     } catch (error) {
+        await logger.error(
+            "Update expertise error",
+            error instanceof Error ? error : { context: "ExpertiseController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             message: "Internal server error",
         });
@@ -304,6 +361,10 @@ export const deleteExpertise = async (
     try {
         const validateId = ExpertiseIdSchema.safeParse(req.params);
         if (!validateId.success) {
+            await logger.warn("Delete expertise invalid ID param", {
+                context: "ExpertiseController",
+                metadata: { errors: validateId.error.issues },
+            });
             return res.status(400).json({
                 message: validateId.error.issues,
             });
@@ -314,6 +375,7 @@ export const deleteExpertise = async (
             await ExpertiseModel.findOne({ _id: id, isDeleted: false });
 
         if (!expertise) {
+            await logger.warn(`Delete expertise: Not found for ID: ${id}`, { context: "ExpertiseController" });
             return res.status(404).json({
                 message: "Expertise not found",
             });
@@ -322,6 +384,7 @@ export const deleteExpertise = async (
         const deletedExpertise = await ExpertiseModel.findByIdAndUpdate({ _id: id }, { isDeleted: true });
 
         if (!deletedExpertise) {
+            await logger.warn(`Delete expertise: Failed to mark deleted for ID: ${id}`, { context: "ExpertiseController" });
             return res.status(404).json({
                 message: "Expertise not found",
             });
@@ -340,13 +403,19 @@ export const deleteExpertise = async (
             `Expertise "${expertise.title}" was deleted successfully.`
         );
 
+        await logger.info(`Expertise deleted for ID: ${id}`, { context: "ExpertiseController" });
+
         return res.status(200).json({
             message:
                 "Expertise deleted successfully",
         });
     } catch (error) {
+        await logger.error(
+            "Delete expertise error",
+            error instanceof Error ? error : { context: "ExpertiseController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             message: "Internal server error"
         });
     }
-};
+};

@@ -3,6 +3,7 @@ import { bellmqConnection } from "@config/redis.ts";
 import {
     BlogCacheKeys,
     incrementCacheVersion,
+    logger,
 } from "@utils";
 import { blogModel } from "./Blog.model.ts";
 import type {
@@ -45,6 +46,7 @@ export const blogWorker = new Worker<IBlogCacheJob>(
                 );
 
             if (!blog) {
+                await logger.warn(`Blog worker update failed: Blog not found for ID: ${_id}`, { context: "BlogWorker" });
                 throw new Error("Blog not found");
             }
 
@@ -60,6 +62,11 @@ export const blogWorker = new Worker<IBlogCacheJob>(
                 "Blog Updated",
                 `Blog "${blog.title}" was updated successfully.`
             );
+
+            await logger.info(`Blog updated in database for ID: ${_id}`, {
+                context: "BlogWorker",
+                metadata: { blogId: _id, jobId: job.id },
+            });
 
             return;
         }
@@ -82,6 +89,11 @@ export const blogWorker = new Worker<IBlogCacheJob>(
             "Blog Created",
             `Blog "${blog.title}" was created successfully.`
         );
+
+        await logger.info(`Blog created in database for ID: ${blog._id.toString()}`, {
+            context: "BlogWorker",
+            metadata: { blogId: blog._id.toString(), jobId: job.id },
+        });
     },
     {
         connection: bellmqConnection,
@@ -90,21 +102,19 @@ export const blogWorker = new Worker<IBlogCacheJob>(
 );
 
 blogWorker.on("completed", (job) => {
-    console.log(
-        `Blog cache job completed: ${job.id}`
-    );
+    logger.info(`Blog cache job completed: ${job.id}`, { context: "BlogWorker", metadata: { jobId: job.id } });
 });
 
 blogWorker.on("failed", (job, error) => {
-    console.error(
+    logger.error(
         `Blog cache job failed: ${job?.id}`,
-        error
+        error instanceof Error ? error : { context: "BlogWorker", metadata: { jobId: job?.id, error: String(error) } }
     );
 });
 
 blogWorker.on("error", (error) => {
-    console.error(
-        "Blog worker error:",
-        error
+    logger.error(
+        "Blog worker error",
+        error instanceof Error ? error : { context: "BlogWorker", metadata: { error: String(error) } }
     );
-});
+});

@@ -7,23 +7,27 @@ import {
   getCacheVersion,
   ContactCacheKeys,
   setCache,
+  logger,
 } from "@utils";
 import { CreateContactJob } from "./Contact.queue.ts";
 import {
   sendInfoNotification,
   sendDangerNotification,
 } from "@modules/Notification/Notification.service.ts";
-import {ContactIdSchema, CreateContactSchema, UpdateContactStatusSchema} from "./Contact.validation.ts";
+import { ContactIdSchema, CreateContactSchema, UpdateContactStatusSchema } from "./Contact.validation.ts";
 
 export const createContact = async (
   req: Request,
   res: Response,
 ) => {
   try {
-    
     const validate = CreateContactSchema.safeParse(req.body);
 
-    if(!validate.success){
+    if (!validate.success) {
+      await logger.warn("Create contact validation failed", {
+        context: "ContactController",
+        metadata: { errors: validate.error.issues },
+      });
       return res.status(400).json({
         message: validate.error.issues,
       });
@@ -36,11 +40,16 @@ export const createContact = async (
       message
     } = validate.data;
 
-    await CreateContactJob({
+    const job = await CreateContactJob({
       name,
       email,
       mobile,
       message
+    });
+
+    await logger.info(`Contact message queued from: ${name} (${email})`, {
+      context: "ContactController",
+      metadata: { jobId: job.id, email },
     });
 
     return res.status(201).json({
@@ -48,22 +57,26 @@ export const createContact = async (
       message: "Contact created successfully",
     });
   } catch (error) {
+    await logger.error(
+      "Contact Creation Failed",
+      error instanceof Error ? error : { context: "ContactController", metadata: { error: String(error) } }
+    );
     await sendDangerNotification(
       "Contact Creation Failed",
       "Failed to create a contact."
     );
 
-    return res.status(400).json({
+    return res.status(500).json({
       success: false,
-      message: "Invalid request body",
-      error: error,
+      message: "Failed to create contact",
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 };
 
 export const GetContact = async (
   req: Request,
-  res: Response
+  res: Response,
 ) => {
   try {
     const page = Number(req.query.page) || 1;
@@ -84,6 +97,7 @@ export const GetContact = async (
     );
 
     if (cachedContacts) {
+      await logger.debug("Fetched contacts from cache", { context: "ContactController" });
       return res.status(200).json({
         data: cachedContacts,
         source: "cache",
@@ -93,7 +107,7 @@ export const GetContact = async (
     const skip = (page - 1) * limit;
 
     const contacts = await contactModel
-      .find({isDeleted:false})
+      .find({ isDeleted: false })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -104,6 +118,8 @@ export const GetContact = async (
       contacts,
       60 * 60
     );
+
+    await logger.info(`Fetched ${contacts.length} contacts from database`, { context: "ContactController" });
     
     return res.status(200).json({
       success: true,
@@ -111,20 +127,28 @@ export const GetContact = async (
       source: "database",
     });
   } catch (error) {
-    return res.status(400).json({
+    await logger.error(
+      "GetContact error",
+      error instanceof Error ? error : { context: "ContactController", metadata: { error: String(error) } }
+    );
+    return res.status(500).json({
       success: false,
-      message: error,
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 };
 
 export const UpdateContactStatus = async (
   req: Request,
-  res: Response
+  res: Response,
 ) => {
   try {
     const validate = UpdateContactStatusSchema.safeParse(req.body);
     if (!validate.success) {
+      await logger.warn("Update contact status validation failed", {
+        context: "ContactController",
+        metadata: { errors: validate.error.issues },
+      });
       return res.status(400).json({
         message: validate.error.issues,
       });
@@ -139,13 +163,14 @@ export const UpdateContactStatus = async (
     );
 
     if (!contact) {
+      await logger.warn(`Update contact status: Contact not found with ID: ${_id}`, { context: "ContactController" });
       return res.status(404).json({
         success: false,
         message: "Contact not found",
       });
     }
 
-     await incrementCacheVersion(
+    await incrementCacheVersion(
       ContactCacheKeys.listVersion()
     );
 
@@ -154,32 +179,41 @@ export const UpdateContactStatus = async (
       `Contact status changed to ${status}.`
     );
 
+    await logger.info(`Contact status updated for ${_id} to ${status}`, { context: "ContactController" });
+
     return res.status(200).json({
       success: true,
       data: contact,
     });
   } catch (error) {
+    await logger.error(
+      "Contact Update Failed",
+      error instanceof Error ? error : { context: "ContactController", metadata: { error: String(error) } }
+    );
     await sendDangerNotification(
       "Contact Update Failed",
       "Failed to update contact status."
     );
 
-    return res.status(400).json({
+    return res.status(500).json({
       success: false,
-      message: error,
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 };
 
 export const DeleteContact = async (
   req: Request,
-  res: Response
+  res: Response,
 ) => {
   try {
-
     const validate = ContactIdSchema.safeParse(req.params);
 
     if (!validate.success) {
+      await logger.warn("Delete contact invalid params", {
+        context: "ContactController",
+        metadata: { errors: validate.error.issues },
+      });
       return res.status(400).json({
         message: "Invalid request params",
         error: validate.error.issues,
@@ -189,15 +223,17 @@ export const DeleteContact = async (
     const { _id } = req.params;
 
     const contact =
-      await contactModel.findByIdAndUpdate(_id,{isDeleted:true});
+      await contactModel.findByIdAndUpdate(_id, { isDeleted: true });
 
     if (!contact) {
+      await logger.warn(`Delete contact: Contact not found with ID: ${_id}`, { context: "ContactController" });
       return res.status(404).json({
         success: false,
         message: "Contact not found",
       });
     }
-   await incrementCacheVersion(
+
+    await incrementCacheVersion(
       ContactCacheKeys.listVersion()
     );
 
@@ -206,19 +242,25 @@ export const DeleteContact = async (
       "Contact has been deleted successfully."
     );
 
+    await logger.info(`Contact deleted for ID: ${_id}`, { context: "ContactController" });
+
     return res.status(200).json({
       success: true,
       message: "Contact Deleted successfully",
     });
   } catch (error) {
+    await logger.error(
+      "Contact Deletion Failed",
+      error instanceof Error ? error : { context: "ContactController", metadata: { error: String(error) } }
+    );
     await sendDangerNotification(
       "Contact Deletion Failed",
       "Failed to delete contact."
     );
 
-    return res.status(400).json({
+    return res.status(500).json({
       success: false,
-      message: error,
+      message: error instanceof Error ? error.message : String(error),
     });
   }
-};
+};

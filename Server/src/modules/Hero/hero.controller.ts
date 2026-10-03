@@ -9,7 +9,8 @@ import {
     getUploadedFile,
     Get_Signed_Url,
     uploadWithRetry,
-    ImageFileSchema
+    ImageFileSchema,
+    logger,
 } from "@utils";
 import { addUpdateHeroJob } from "./Hero.queue.ts";
 import { sendInfoNotification } from "@modules/Notification/Notification.service.ts";
@@ -35,6 +36,7 @@ export const getHero = async (
             await getCache(cacheKey);
 
         if (cachedHero) {
+            await logger.debug("Fetched Hero from cache", { context: "HeroController" });
             return res.status(200).json({
                 data: cachedHero,
                 source: "cache",
@@ -45,6 +47,7 @@ export const getHero = async (
             await HeroModel.findOne().lean();
 
         if (!hero) {
+            await logger.warn("Hero not found in database", { context: "HeroController" });
             return res.status(404).json({
                 message: "Hero not found",
             });
@@ -62,11 +65,17 @@ export const getHero = async (
             60 * 60 * 24
         );
 
+        await logger.info("Fetched Hero from database", { context: "HeroController" });
+
         return res.status(200).json({
             data: hero,
             source: "database",
         });
     } catch (error) {
+        await logger.error(
+            "Get Hero error",
+            error instanceof Error ? error : { context: "HeroController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             message: "Internal server error",
         });
@@ -80,6 +89,10 @@ export const updateHero = async (
     try {
         const validate = UpdateHeroSchema.safeParse(req.body);
         if (!validate.success) {
+            await logger.warn("Update hero validation failed", {
+                context: "HeroController",
+                metadata: { errors: validate.error.issues },
+            });
             return res.status(400).json({
                 message: validate.error.issues,
             });
@@ -95,6 +108,10 @@ export const updateHero = async (
         const validateFile = ImageFileSchema.safeParse(file);
 
         if (!validateFile.success) {
+            await logger.warn("Update hero image validation failed", {
+                context: "HeroController",
+                metadata: { errors: validateFile.error.issues },
+            });
             return res.status(400).json({
                 message: validateFile.error.issues,
             });
@@ -103,6 +120,7 @@ export const updateHero = async (
         const hero = await HeroModel.findOne().lean();
 
         if (!hero) {
+            await logger.warn("Update hero: Hero not found", { context: "HeroController" });
             return res.status(404).json({
                 message: "Hero not found",
             });
@@ -130,14 +148,23 @@ export const updateHero = async (
             "Hero section was added to the update queue and is being processed."
         );
 
+        await logger.info("Hero update queued successfully", {
+            context: "HeroController",
+            metadata: { jobId: job.id, name },
+        });
+
         return res.status(202).json({
             message:
                 "Hero section was added to the update queue and is being processed.",
             jobId: job.id,
         });
     } catch (error) {
+        await logger.error(
+            "Update Hero error",
+            error instanceof Error ? error : { context: "HeroController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             message: "Internal server error",
         });
     }
-};
+};

@@ -17,11 +17,11 @@ import {
     uploadFileToS3,
     NoteCacheKeys,
     incrementCacheVersion,
-    getUploadedFile,
     getFiles,
     uploadWithRetry,
     ImageFileSchema,
-    PdfFileSchema
+    PdfFileSchema,
+    logger,
 } from "@utils";
 import { sendInfoNotification } from "../Notification/Notification.service.ts";
 
@@ -34,6 +34,10 @@ export const CreateNote = async (
             CreateNoteSchema.safeParse(req.body);
 
         if (!validation.success) {
+            await logger.warn("Create note validation failed", {
+                context: "NoteController",
+                metadata: { errors: validation.error.issues },
+            });
             return res.status(400).json({
                 message: validation.error.issues[0]?.message,
             });
@@ -47,6 +51,10 @@ export const CreateNote = async (
         const validateImage = ImageFileSchema.safeParse(image);
 
         if (!validateImage.success) {
+            await logger.warn("Create note image validation failed", {
+                context: "NoteController",
+                metadata: { errors: validateImage.error.issues },
+            });
             return res.status(400).json({
                 message: validateImage.error.issues[0]?.message,
             });
@@ -55,6 +63,10 @@ export const CreateNote = async (
         const validatePdf = PdfFileSchema.safeParse(pdf);
 
         if (!validatePdf.success) {
+            await logger.warn("Create note PDF validation failed", {
+                context: "NoteController",
+                metadata: { errors: validatePdf.error.issues },
+            });
             return res.status(400).json({
                 message: validatePdf.error.issues[0]?.message,
             });
@@ -86,6 +98,11 @@ export const CreateNote = async (
             `Note "${title}" was added to the queue and is being processed.`,
         );
 
+        await logger.info(`Note creation queued: ${title}`, {
+            context: "NoteController",
+            metadata: { jobId: job.id, title },
+        });
+
         return res.status(202).json({
             success: true,
             message:
@@ -93,6 +110,10 @@ export const CreateNote = async (
             jobId: job.id,
         });
     } catch (error) {
+        await logger.error(
+            "Create note error",
+            error instanceof Error ? error : { context: "NoteController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             success: false,
             message:
@@ -137,6 +158,7 @@ export const GetNote = async (
             await getCache(cacheKey);
 
         if (cached) {
+            await logger.debug("Fetched notes from cache", { context: "NoteController" });
             return res.status(200).json({
                 success: true,
                 data: cached,
@@ -199,11 +221,17 @@ export const GetNote = async (
             600,
         );
 
+        await logger.info(`Fetched ${data.length} notes from database`, { context: "NoteController" });
+
         return res.status(200).json({
             success: true,
             data: response,
         });
     } catch (error) {
+        await logger.error(
+            "GetNote error",
+            error instanceof Error ? error : { context: "NoteController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             success: false,
             message:
@@ -225,6 +253,10 @@ export const GetNoteById = async (
             );
 
         if (!validation.success) {
+            await logger.warn("Get note by ID validation failed", {
+                context: "NoteController",
+                metadata: { errors: validation.error.issues },
+            });
             return res.status(400).json({
                 success: false,
                 message:
@@ -251,6 +283,7 @@ export const GetNoteById = async (
             await getCache(cacheKey);
 
         if (cached) {
+            await logger.debug(`Fetched note from cache for ID: ${_id}`, { context: "NoteController" });
             return res.status(200).json({
                 success: true,
                 data: cached,
@@ -263,6 +296,7 @@ export const GetNoteById = async (
             ).lean();
 
         if (!note) {
+            await logger.warn(`Note not found with ID: ${_id}`, { context: "NoteController" });
             return res.status(404).json({
                 success: false,
                 message: "Note not found",
@@ -299,11 +333,17 @@ export const GetNoteById = async (
             600,
         );
 
+        await logger.info(`Fetched note from database for ID: ${_id}`, { context: "NoteController" });
+
         return res.status(200).json({
             success: true,
             data,
         });
     } catch (error) {
+        await logger.error(
+            "GetNoteById error",
+            error instanceof Error ? error : { context: "NoteController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             success: false,
             message:
@@ -322,6 +362,10 @@ export const EditNote = async (
         UpdateNoteSchema.safeParse(req.body);
 
     if (!validation.success) {
+        await logger.warn("Edit note validation failed", {
+            context: "NoteController",
+            metadata: { errors: validation.error.issues },
+        });
         return res.status(400).json({
             success: false,
             message:
@@ -343,6 +387,7 @@ export const EditNote = async (
             await NoteModel.findById(_id);
 
         if (!note) {
+            await logger.warn(`Edit note: Not found for ID: ${_id}`, { context: "NoteController" });
             return res.status(404).json({
                 success: false,
                 message: "Note not found",
@@ -400,6 +445,11 @@ export const EditNote = async (
             `Note "${note.title}" was added to the queue and is being updated.`,
         );
 
+        await logger.info(`Note update queued for ID: ${_id}`, {
+            context: "NoteController",
+            metadata: { jobId: job.id, noteId: _id },
+        });
+
         return res.status(202).json({
             success: true,
             message:
@@ -407,6 +457,10 @@ export const EditNote = async (
             jobId: job.id,
         });
     } catch (error) {
+        await logger.error(
+            "Edit note error",
+            error instanceof Error ? error : { context: "NoteController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             success: false,
             message:
@@ -428,6 +482,10 @@ export const DeleteNote = async (
             );
 
         if (!validation.success) {
+            await logger.warn("Delete note invalid params", {
+                context: "NoteController",
+                metadata: { errors: validation.error.issues },
+            });
             return res.status(400).json({
                 success: false,
                 message:
@@ -441,6 +499,7 @@ export const DeleteNote = async (
             await NoteModel.findById(_id);
 
         if (!note) {
+            await logger.warn(`Delete note: Not found for ID: ${_id}`, { context: "NoteController" });
             return res.status(404).json({
                 success: false,
                 message: "Note not found",
@@ -466,12 +525,18 @@ export const DeleteNote = async (
             `Note "${note.title}" was deleted successfully.`,
         );
 
+        await logger.info(`Note deleted for ID: ${_id}`, { context: "NoteController" });
+
         return res.status(200).json({
             success: true,
             message:
                 "Note deleted successfully",
         });
     } catch (error) {
+        await logger.error(
+            "Delete note error",
+            error instanceof Error ? error : { context: "NoteController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             success: false,
             message:
@@ -480,4 +545,4 @@ export const DeleteNote = async (
                     : String(error),
         });
     }
-};
+};

@@ -1,5 +1,5 @@
 import mongoose, { type HydratedDocument } from "mongoose";
-import type { IAdmin } from "@type";
+import type { IAdmin } from "./Auth.types.ts";
 
 const AdminSchema = new mongoose.Schema<IAdmin>(
   {

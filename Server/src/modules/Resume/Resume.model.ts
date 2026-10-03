@@ -1,6 +1,6 @@
 import mongoose from 'mongoose'
 import type { HydratedDocument } from 'mongoose';
-import type { IResume } from '@type';
+import type { IResume } from "./Resume.types.ts";
 
 const ResumeSchema = new mongoose.Schema<IResume>({
     CV:{

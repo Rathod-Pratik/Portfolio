@@ -68,3 +68,6 @@ export const HERO_ID =
 
 export const NoteCacheKeys =
     createCacheKeys("note");
+
+export const LoggerCacheKeys =
+    createCacheKeys("logger");

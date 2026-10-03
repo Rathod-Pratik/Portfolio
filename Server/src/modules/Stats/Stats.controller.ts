@@ -1,10 +1,11 @@
 import { AdminModel } from '../Auth/Auth.model.ts';
-import {blogModel} from '../Blog/Blog.model.ts';
+import { blogModel } from '../Blog/Blog.model.ts';
 import { NoteModel } from '../Note/Note.model.ts';
 import { Project } from '../Project/Project.model.ts';
 import { contactModel } from '../Contact/contact.model.ts';
 import { SkillsModel } from '../Skill/Skills.model.ts';
 import type { Request, Response } from 'express';
+import { logger } from '@utils';
 
 export const FetchStates = async (
   _req: Request,
@@ -18,6 +19,8 @@ export const FetchStates = async (
     const ContactLength = await contactModel.countDocuments();
     const SkillLength = await SkillsModel.countDocuments();
 
+    await logger.info("Fetched dashboard stats successfully", { context: "StatsController" });
+
     return res.status(200).json({
       BlogLength,
       ProjectLength,
@@ -27,6 +30,10 @@ export const FetchStates = async (
       AdminView: admin ? admin.view : 0,
     });
   } catch (error) {
+    await logger.error(
+      "FetchStates error",
+      error instanceof Error ? error : { context: "StatsController", metadata: { error: String(error) } }
+    );
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -43,15 +50,23 @@ export const IncrementView = async (
     );
 
     if (!admin) {
+      await logger.warn("IncrementView: Unable to update view", { context: "StatsController" });
       return res.status(500).json({ message: "Unable to update view" });
     }
+
+    await logger.info(`View count incremented to ${admin.view}`, { context: "StatsController" });
 
     return res
       .status(200)
       .json({ message: "View incremented successfully", view: admin.view });
   } catch (error) {
+    await logger.error(
+      "IncrementView error",
+      error instanceof Error ? error : { context: "StatsController", metadata: { error: String(error) } }
+    );
     return res
       .status(500)
       .json({ message: "Internal server error" });
   }
 };
+

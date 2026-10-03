@@ -1,16 +1,14 @@
 import type { Request, Response } from "express";
 import { AboutModel } from "./About.model.ts";
-import { getCache, setCache, getCacheVersion, AboutCacheKeys } from "@utils";
+import { getCache, setCache, getCacheVersion, AboutCacheKeys, logger } from "@utils";
 import { addAboutCacheJob } from "./About.queue.ts";
 import { sendInfoNotification } from "@modules/Notification/Notification.service.ts";
 import { AboutSchema } from "./About.validation.ts";
-
 
 export const getAbout = async (
   req: Request,
   res: Response
 ) => {
-
   try {
     const version = await getCacheVersion(
       AboutCacheKeys.detailsVersion('about')
@@ -23,6 +21,7 @@ export const getAbout = async (
       await getCache(cacheKey);
 
     if (cachedAbout) {
+      await logger.debug("Fetched About details from cache", { context: "AboutController" });
       return res.status(200).json({
         data: cachedAbout,
         'source': 'cache',
@@ -33,6 +32,7 @@ export const getAbout = async (
       await AboutModel.findOne().lean();
 
     if (!about) {
+      await logger.warn("About information not found", { context: "AboutController" });
       return res.status(404).json({
         message: "About information not found",
       });
@@ -44,14 +44,15 @@ export const getAbout = async (
       600
     );
 
+    await logger.info("Fetched About details from database", { context: "AboutController" });
     return res.status(200).json({
       data: about,
       'source': 'database',
     });
   } catch (error) {
-    console.error(
-      "Get About error:",
-      error
+    await logger.error(
+      "Get About error",
+      error instanceof Error ? error : { context: "AboutController", metadata: { error: String(error) } }
     );
 
     return res.status(500).json({
@@ -67,6 +68,10 @@ export const updateAbout = async (
   const validate = AboutSchema.safeParse(req.body);
 
   if (!validate.success) {
+    await logger.warn("Update About validation failed", {
+      context: "AboutController",
+      metadata: { errors: validate.error.issues },
+    });
     return res.status(400).json({
       message: validate.error.issues,
     });
@@ -74,26 +79,31 @@ export const updateAbout = async (
   const { content } = validate.data;
 
   try {
-    await addAboutCacheJob({
+    const job = await addAboutCacheJob({
       content: content,
     });
 
-    
     await sendInfoNotification(
       "About Updated",
       "About information was updated successfully."
     );
+
+    await logger.info("About update queued successfully", {
+      context: "AboutController",
+      metadata: { jobId: job.id },
+    });
+
     return res.status(200).json({
       message: "About updated successfully",
     });
   } catch (error) {
-    console.error(
-      "Update About error:",
-      error
+    await logger.error(
+      "Update About error",
+      error instanceof Error ? error : { context: "AboutController", metadata: { error: String(error) } }
     );
 
     return res.status(500).json({
       message: "Internal server error",
     });
   }
-};
+};

@@ -5,7 +5,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-// import { logger } from "@modules/log/logger";
+import { logger } from "@modules/Logger/Logger.service.ts";
 
 import dotenv from "dotenv";
 import type { Request } from "express";
@@ -177,12 +177,13 @@ export const uploadWithRetry = async (
     } catch (error) {
       lastError = error;
 
-      // logger.warn("S3 upload failed", {
-      //   metadata: {
-      //     fileName: file.originalname,
-      //     attempt,
-      //   },
-      // });
+      logger.warn("S3 upload failed", {
+        context: 'S3 Upload',
+        metadata: {
+          fileName: file.originalname,
+          attempt,
+        },
+      });
 
       if (attempt < retries) {
         await new Promise((resolve) =>

@@ -4,6 +4,7 @@ import { ExpertiseModel } from "./Expertise.model.ts";
 import {
     incrementCacheVersion,
     ExpertiseCacheKeys,
+    logger,
 } from "@utils";
 import type { IExpertiseJob } from "./Expertise.types.ts";
 
@@ -20,6 +21,11 @@ export const expertiseWorker =
                 await incrementCacheVersion(
                     ExpertiseCacheKeys.listVersion()
                 );
+
+                await logger.info(`Expertise created in DB: ${expertise.title}`, {
+                    context: "ExpertiseWorker",
+                    metadata: { expertiseId: expertise._id.toString(), jobId: job.id },
+                });
 
                 return expertise;
             }
@@ -40,6 +46,7 @@ export const expertiseWorker =
                 );
 
             if (!expertise) {
+                await logger.warn(`Expertise worker update failed: ID not found: ${expertiseId}`, { context: "ExpertiseWorker" });
                 throw new Error(
                     "Expertise not found"
                 );
@@ -55,6 +62,11 @@ export const expertiseWorker =
                 )
             );
 
+            await logger.info(`Expertise updated in DB for ID: ${expertiseId}`, {
+                context: "ExpertiseWorker",
+                metadata: { expertiseId, jobId: job.id },
+            });
+
             return expertise;
         },
         {
@@ -66,18 +78,16 @@ export const expertiseWorker =
 expertiseWorker.on(
     "completed",
     (job) => {
-        console.log(
-            `Expertise job completed: ${job.id}`
-        );
+        logger.info(`Expertise job completed: ${job.id}`, { context: "ExpertiseWorker", metadata: { jobId: job.id } });
     }
 );
 
 expertiseWorker.on(
     "failed",
     (job, error) => {
-        console.error(
+        logger.error(
             `Expertise job failed: ${job?.id}`,
-            error
+            error instanceof Error ? error : { context: "ExpertiseWorker", metadata: { jobId: job?.id, error: String(error) } }
         );
     }
 );
@@ -85,9 +95,9 @@ expertiseWorker.on(
 expertiseWorker.on(
     "error",
     (error) => {
-        console.error(
-            "Expertise worker error:",
-            error
+        logger.error(
+            "Expertise worker error",
+            error instanceof Error ? error : { context: "ExpertiseWorker", metadata: { error: String(error) } }
         );
     }
-);
+);

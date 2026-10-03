@@ -1,5 +1,5 @@
 import mongoose, { type HydratedDocument } from "mongoose";
-import type { INote } from "@type";
+import type { INote } from "./Note.types.ts";
 
 const notesSchema = new mongoose.Schema<INote>({
     title:{

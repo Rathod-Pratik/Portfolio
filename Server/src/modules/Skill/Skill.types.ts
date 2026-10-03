@@ -1,4 +1,11 @@
-import type { ISkill } from "@type";
+export interface ISkill {
+    _id?: string;
+    language: string;
+    percentage: number;
+    color: string;
+    createdAt?: Date;
+    updatedAt?: Date;
+}
 
 export interface ICreateSkillJob {
     type: "create";

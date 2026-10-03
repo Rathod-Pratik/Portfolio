@@ -5,6 +5,7 @@ import {
     incrementCacheVersion,
     HeroCacheKeys,
     HERO_ID,
+    logger,
 } from "@utils";
 import type { IHeroJob } from "./Hero.types.ts";
 import { sendInfoNotification } from "@modules/Notification/Notification.index.ts";
@@ -36,6 +37,11 @@ export const heroWorker =
                 `Hero updated: ${hero.name}.`
             );
 
+            await logger.info(`Hero updated in DB: ${hero.name}`, {
+                context: "HeroWorker",
+                metadata: { jobId: job.id, name: hero.name },
+            });
+
             return hero;
         },
         {
@@ -47,18 +53,16 @@ export const heroWorker =
 heroWorker.on(
     "completed",
     (job) => {
-        console.log(
-            `Hero job completed: ${job.id}`
-        );
+        logger.info(`Hero job completed: ${job.id}`, { context: "HeroWorker", metadata: { jobId: job.id } });
     }
 );
 
 heroWorker.on(
     "failed",
     (job, error) => {
-        console.error(
+        logger.error(
             `Hero job failed: ${job?.id}`,
-            error
+            error instanceof Error ? error : { context: "HeroWorker", metadata: { jobId: job?.id, error: String(error) } }
         );
     }
 );
@@ -66,9 +70,9 @@ heroWorker.on(
 heroWorker.on(
     "error",
     (error) => {
-        console.error(
-            "Hero worker error:",
-            error
+        logger.error(
+            "Hero worker error",
+            error instanceof Error ? error : { context: "HeroWorker", metadata: { error: String(error) } }
         );
     }
-);
+);

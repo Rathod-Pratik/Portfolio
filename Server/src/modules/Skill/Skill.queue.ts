@@ -3,7 +3,8 @@ import { bellmqConnection } from "@config/redis.ts";
 import type {
     ICreateSkillJob,
     IUpdateSkillJob,
-} from "./Skills.types.ts";
+} from "./Skill.types.ts";
+
 
 export const SKILL_QUEUE_NAME = "skill";
 

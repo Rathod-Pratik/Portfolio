@@ -1,42 +1,59 @@
-import { AdminModel } from './Auth.model.ts';
+import { AdminModel } from "./Auth.model.ts";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { randomInt } from "node:crypto";
-import { sendForgotPasswordOtpEmail, sendLoginOtpEmail } from '@utils';
-import type { CookieOptions, Response, Request } from 'express';
+import {
+  sendForgotPasswordOtpEmail,
+  sendLoginOtpEmail,
+  getCache,
+  setCache,
+  deleteCache,
+  logger,
+} from "@utils";
+import type { CookieOptions, Response, Request } from "express";
+import {
+  LoginSchema,
+  SignupSchema,
+  ForgotPasswordSchema,
+  VerifyOtpSchema,
+  ResetPasswordSchema,
+  VerifyLoginOtpSchema,
+} from "./Auth.validation.ts";
 import type {
-  ForgotPasswordRequestBody,
+  IOtpCacheData,
   JwtTokenPayload,
-  LoginRequestBody,
-  ResetPasswordRequestBody,
-  SignupRequestBody,
-  VerifyLoginOtpRequestBody,
-  VerifyOtpRequestBody,
-} from '@type';
+} from "./Auth.types.ts";
 
-type TypedRequest<TBody> = Request<Record<string, never>, unknown, TBody>;
+const OTP_TTL_SECONDS = 600; // 10 minutes
+
+const getForgotOtpCacheKey = (email: string): string =>
+  `otp:forgot-password:${email.toLowerCase().trim()}`;
+
+const getLoginOtpCacheKey = (email: string): string =>
+  `otp:login:${email.toLowerCase().trim()}`;
 
 const toErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
     return error.message;
   }
-
   return String(error);
 };
 
-export const Login = async (
-  req: TypedRequest<LoginRequestBody>,
-  res: Response
-) => {
+export const Login = async (req: Request, res: Response) => {
+  const validation = LoginSchema.safeParse(req.body);
+
+  if (!validation.success) {
+    await logger.warn("Login validation failed", {
+      context: "AuthController",
+      metadata: { errors: validation.error.issues },
+    });
+    return res.status(400).json({
+      error: validation.error.issues[0]?.message || "Invalid credentials",
+    });
+  }
+
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        error: "Please fill all the fields",
-      });
-    }
-
+    const { email, password } = validation.data;
     const normalizedEmail = email.toLowerCase().trim();
 
     const user = await AdminModel.findOne({
@@ -44,6 +61,9 @@ export const Login = async (
     });
 
     if (!user) {
+      await logger.warn(`Login failed: Account not found for ${normalizedEmail}`, {
+        context: "AuthController",
+      });
       return res.status(400).json({
         error: "Account not found",
       });
@@ -52,21 +72,46 @@ export const Login = async (
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
+      await logger.warn(`Login failed: Invalid password for ${normalizedEmail}`, {
+        context: "AuthController",
+      });
       return res.status(400).json({
         error: "Please enter valid Password",
       });
+    }
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      await logger.error("JWT_SECRET is not configured", { context: "AuthController" });
+      return res.status(500).json({ error: "JWT secret is missing" });
     }
 
     const token = jwt.sign(
       {
         id: user._id,
         email: user.email,
+        role: user.role,
       },
-      process.env.JWT_SECRET as string,
+      jwtSecret,
       {
         expiresIn: "1d",
       }
     );
+
+    const cookieOptions: CookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 24 * 60 * 60 * 1000,
+      path: "/",
+    };
+
+    res.cookie("admin", token, cookieOptions);
+
+    await logger.info(`User logged in successfully: ${normalizedEmail}`, {
+      context: "AuthController",
+      metadata: { userId: user._id.toString() },
+    });
 
     return res.status(200).json({
       message: "Login successful",
@@ -74,10 +119,15 @@ export const Login = async (
       user: {
         id: user._id,
         email: user.email,
+        FirstName: user.FirstName,
+        LastName: user.LastName,
       },
     });
   } catch (error) {
-    console.error("Error during login:", toErrorMessage(error));
+    await logger.error(
+      "Error during login",
+      error instanceof Error ? error : { context: "AuthController", metadata: { error: toErrorMessage(error) } }
+    );
 
     return res.status(500).json({
       error: "Internal Server Error",
@@ -85,41 +135,73 @@ export const Login = async (
   }
 };
 
-export const verifyLoginOtp = async (req: TypedRequest<VerifyLoginOtpRequestBody>, res: Response) => {
+export const verifyLoginOtp = async (req: Request, res: Response) => {
+  const validation = VerifyLoginOtpSchema.safeParse(req.body);
+
+  if (!validation.success) {
+    await logger.warn("Verify login OTP validation failed", {
+      context: "AuthController",
+      metadata: { errors: validation.error.issues },
+    });
+    return res.status(400).json({
+      error: validation.error.issues[0]?.message || "Email and OTP are required",
+    });
+  }
+
   try {
-    const { email, otp } = req.body;
+    const { email, otp } = validation.data;
+    const normalizedEmail = email.toLowerCase().trim();
 
-    if (!email || !otp) {
-      return res.status(400).json({ error: "Email and OTP are required" });
-    }
-
-    const normalizedEmail = email.toLowerCase();
     const user = await AdminModel.findOne({ email: normalizedEmail });
 
-    if (!user || !user.loginOtpHash || !user.loginOtpExpiresAt) {
-      return res.status(400).json({ error: "OTP not requested" });
+    if (!user) {
+      await logger.warn(`Login OTP verification: Account not found for ${normalizedEmail}`, {
+        context: "AuthController",
+      });
+      return res.status(404).json({ error: "Account not found" });
     }
 
-    if (user.loginOtpExpiresAt.getTime() < Date.now()) {
-      return res.status(400).json({ error: "OTP has expired" });
+    const cacheKey = getLoginOtpCacheKey(normalizedEmail);
+    const cachedOtpData = await getCache<IOtpCacheData>(cacheKey);
+
+    let isMatch = false;
+
+    if (cachedOtpData) {
+      isMatch = await bcrypt.compare(otp, cachedOtpData.otpHash);
+    } else if (user.loginOtpHash && user.loginOtpExpiresAt) {
+      if (user.loginOtpExpiresAt.getTime() >= Date.now()) {
+        isMatch = await bcrypt.compare(otp, user.loginOtpHash);
+      }
     }
 
-    const isMatch = await bcrypt.compare(String(otp), user.loginOtpHash);
+    if (!cachedOtpData && (!user.loginOtpHash || !user.loginOtpExpiresAt)) {
+      await logger.warn(`Login OTP verification: OTP not requested for ${normalizedEmail}`, {
+        context: "AuthController",
+      });
+      return res.status(400).json({ error: "OTP not requested or expired" });
+    }
 
     if (!isMatch) {
+      await logger.warn(`Login OTP verification: Invalid OTP for ${normalizedEmail}`, {
+        context: "AuthController",
+      });
       return res.status(400).json({ error: "Invalid OTP" });
     }
 
+    await deleteCache(cacheKey);
     user.loginOtpHash = null;
     user.loginOtpExpiresAt = null;
     await user.save();
 
-    const tokenPayload: JwtTokenPayload = user.role
-      ? { id: user.id, role: user.role }
-      : { id: user.id };
-    const jwtSecret = process.env.JWT_SECRET;
+    const tokenPayload: JwtTokenPayload = {
+      id: user._id?.toString() || "",
+      email: user.email,
+      role: user.role,
+    };
 
+    const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
+      await logger.error("JWT_SECRET is not configured", { context: "AuthController" });
       return res.status(500).json({ error: "JWT_SECRET is not configured" });
     }
 
@@ -135,166 +217,296 @@ export const verifyLoginOtp = async (req: TypedRequest<VerifyLoginOtpRequestBody
 
     res.cookie("admin", token, cookieOptions);
 
+    await logger.info(`Admin login verified with OTP: ${normalizedEmail}`, {
+      context: "AuthController",
+    });
+
     return res.status(200).json({
       userInfo: user,
+      token,
       message: "Admin login successful",
     });
   } catch (error) {
-    console.error("Login OTP verification error:", toErrorMessage(error));
+    await logger.error(
+      "Login OTP verification error",
+      error instanceof Error ? error : { context: "AuthController", metadata: { error: toErrorMessage(error) } }
+    );
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
+export const signup = async (req: Request, res: Response) => {
+  const validation = SignupSchema.safeParse(req.body);
 
-export const signup = async (req: TypedRequest<SignupRequestBody>, res: Response) => {
+  if (!validation.success) {
+    await logger.warn("Signup validation failed", {
+      context: "AuthController",
+      metadata: { errors: validation.error.issues },
+    });
+    return res.status(400).json({
+      error: validation.error.issues[0]?.message || "Please fill all fields properly",
+    });
+  }
+
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name } = validation.data;
+    const normalizedEmail = email.toLowerCase().trim();
 
-    //Check if email and password are provided
-    if (!email || !password || !name) {
-      return res.status(400).json({ error: "Please fill all the fields" });
-    }
-    //Check if user already exists
-    const existUser = await AdminModel.findOne({ email });
+    const existUser = await AdminModel.findOne({ email: normalizedEmail });
     if (existUser) {
+      await logger.warn(`Signup failed: User already exists (${normalizedEmail})`, {
+        context: "AuthController",
+      });
       return res.status(400).json({ error: "User already exists" });
     }
 
-    const solt = await bcrypt.genSalt(10);
-    const hashPassword = await bcrypt.hash(password, solt);
+    const salt = await bcrypt.genSalt(10);
+    const hashPassword = await bcrypt.hash(password, salt);
     const [firstName, ...rest] = name.split(" ");
-    const lastName = rest.join(" ");
+    const lastName = rest.join(" ") || "";
+
     const user = await AdminModel.create({
       FirstName: firstName,
       LastName: lastName,
-      email: email.toLowerCase(),
+      email: normalizedEmail,
       password: hashPassword,
     });
 
-    return res.status(201).send({ user });
+    await logger.info(`New user registered: ${normalizedEmail}`, {
+      context: "AuthController",
+      metadata: { userId: user._id.toString() },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Account created successfully",
+      user: {
+        id: user._id,
+        email: user.email,
+        FirstName: user.FirstName,
+        LastName: user.LastName,
+      },
+    });
   } catch (error) {
-    res.status(403).json({ error: toErrorMessage(error) });
+    await logger.error(
+      "Signup error",
+      error instanceof Error ? error : { context: "AuthController", metadata: { error: toErrorMessage(error) } }
+    );
+    return res.status(500).json({ error: toErrorMessage(error) });
   }
 };
 
 export const Logout = async (req: Request, res: Response) => {
   try {
-    console.log("Cookies:", req.cookies);
     res.clearCookie("admin", {
       httpOnly: true,
-      secure: true,
-      sameSite: "none",
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      path: "/",
     });
+
+    await logger.info("Admin logged out successfully", { context: "AuthController" });
 
     return res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
+    await logger.error(
+      "Logout error",
+      error instanceof Error ? error : { context: "AuthController", metadata: { error: toErrorMessage(error) } }
+    );
     return res.status(500).json({ error: "Logout failed" });
   }
 };
 
-export const forgotPassword = async (req: TypedRequest<ForgotPasswordRequestBody>, res: Response) => {
+export const forgotPassword = async (req: Request, res: Response) => {
+  const validation = ForgotPasswordSchema.safeParse(req.body);
+
+  if (!validation.success) {
+    await logger.warn("Forgot password validation failed", {
+      context: "AuthController",
+      metadata: { errors: validation.error.issues },
+    });
+    return res.status(400).json({
+      error: validation.error.issues[0]?.message || "Valid email is required",
+    });
+  }
+
   try {
-    const { email } = req.body;
+    const { email } = validation.data;
+    const normalizedEmail = email.toLowerCase().trim();
 
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
-    }
-
-    const normalizedEmail = email.toLowerCase();
     const user = await AdminModel.findOne({ email: normalizedEmail });
 
     if (!user) {
+      await logger.warn(`Forgot password: Account not found for ${normalizedEmail}`, {
+        context: "AuthController",
+      });
       return res.status(404).json({ error: "Account not found" });
     }
 
+    // 1. Generate 6-digit random OTP
     const otp = String(randomInt(100000, 1000000));
+
+    // 2. Hash OTP for secure storage
     const otpHash = await bcrypt.hash(otp, 10);
-    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    user.resetOtpHash = otpHash;
-    user.resetOtpExpiresAt = otpExpiresAt;
-    user.resetOtpVerified = false;
-    await user.save();
+    // 3. Cache OTP in Redis with 10 minutes TTL
+    const cacheKey = getForgotOtpCacheKey(normalizedEmail);
+    await setCache<IOtpCacheData>(
+      cacheKey,
+      {
+        email: normalizedEmail,
+        otpHash,
+        isVerified: false,
+        createdAt: Date.now(),
+      },
+      OTP_TTL_SECONDS
+    );
 
+    // 4. Send OTP email to user
     await sendForgotPasswordOtpEmail({ to: normalizedEmail, otp });
 
+    await logger.info(`Forgot password OTP sent to email and cached in Redis: ${normalizedEmail}`, {
+      context: "AuthController",
+    });
+
     return res.status(200).json({
-      message: "OTP sent successfully",
+      success: true,
+      message: "OTP sent successfully to your email",
       email: normalizedEmail,
     });
   } catch (error) {
-    console.error("Forgot password error:", toErrorMessage(error));
+    await logger.error(
+      "Forgot password error",
+      error instanceof Error ? error : { context: "AuthController", metadata: { error: toErrorMessage(error) } }
+    );
     return res.status(500).json({ error: "Failed to send OTP" });
   }
 };
 
-export const verifyOtp = async (req: TypedRequest<VerifyOtpRequestBody>, res: Response) => {
+export const verifyOtp = async (req: Request, res: Response) => {
+  const validation = VerifyOtpSchema.safeParse(req.body);
+
+  if (!validation.success) {
+    await logger.warn("Verify OTP validation failed", {
+      context: "AuthController",
+      metadata: { errors: validation.error.issues },
+    });
+    return res.status(400).json({
+      error: validation.error.issues[0]?.message || "Email and OTP are required",
+    });
+  }
+
   try {
-    const { email, otp } = req.body;
+    const { email, otp } = validation.data;
+    const normalizedEmail = email.toLowerCase().trim();
 
-    if (!email || !otp) {
-      return res.status(400).json({ error: "Email and OTP are required" });
+    const cacheKey = getForgotOtpCacheKey(normalizedEmail);
+    const cachedData = await getCache<IOtpCacheData>(cacheKey);
+
+    if (!cachedData || !cachedData.otpHash) {
+      await logger.warn(`Verify OTP: OTP expired or not requested for ${normalizedEmail}`, {
+        context: "AuthController",
+      });
+      return res.status(400).json({
+        error: "OTP has expired or was not requested. Please request a new OTP.",
+      });
     }
 
-    const normalizedEmail = email.toLowerCase();
-    const user = await AdminModel.findOne({ email: normalizedEmail });
-
-    if (!user || !user.resetOtpHash || !user.resetOtpExpiresAt) {
-      return res.status(400).json({ error: "OTP not requested" });
-    }
-
-    if (user.resetOtpExpiresAt.getTime() < Date.now()) {
-      return res.status(400).json({ error: "OTP has expired" });
-    }
-
-    const isMatch = await bcrypt.compare(String(otp), user.resetOtpHash);
+    const isMatch = await bcrypt.compare(otp, cachedData.otpHash);
 
     if (!isMatch) {
+      await logger.warn(`Verify OTP: Invalid OTP entered for ${normalizedEmail}`, {
+        context: "AuthController",
+      });
       return res.status(400).json({ error: "Invalid OTP" });
     }
 
-    user.resetOtpVerified = true;
-    await user.save();
+    // Mark OTP as verified in Redis cache with remaining TTL
+    await setCache<IOtpCacheData>(
+      cacheKey,
+      {
+        ...cachedData,
+        isVerified: true,
+      },
+      OTP_TTL_SECONDS
+    );
+
+    await logger.info(`OTP verified successfully in Redis for ${normalizedEmail}`, {
+      context: "AuthController",
+    });
 
     return res.status(200).json({
+      success: true,
       message: "OTP verified successfully",
       email: normalizedEmail,
     });
   } catch (error) {
-    console.error("OTP verification error:", toErrorMessage(error));
+    await logger.error(
+      "OTP verification error",
+      error instanceof Error ? error : { context: "AuthController", metadata: { error: toErrorMessage(error) } }
+    );
     return res.status(500).json({ error: "Failed to verify OTP" });
   }
 };
 
-export const resetPassword = async (req: TypedRequest<ResetPasswordRequestBody>, res: Response) => {
-  try {
-    const { email, password } = req.body;
+export const resetPassword = async (req: Request, res: Response) => {
+  const validation = ResetPasswordSchema.safeParse(req.body);
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
+  if (!validation.success) {
+    await logger.warn("Reset password validation failed", {
+      context: "AuthController",
+      metadata: { errors: validation.error.issues },
+    });
+    return res.status(400).json({
+      error: validation.error.issues[0]?.message || "Valid email and password are required",
+    });
+  }
+
+  try {
+    const { email, password } = validation.data;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const cacheKey = getForgotOtpCacheKey(normalizedEmail);
+    const cachedData = await getCache<IOtpCacheData>(cacheKey);
+
+    if (!cachedData || !cachedData.isVerified) {
+      await logger.warn(`Reset password rejected: OTP not verified for ${normalizedEmail}`, {
+        context: "AuthController",
+      });
+      return res.status(400).json({
+        error: "OTP verification is required or has expired. Please verify OTP first.",
+      });
     }
 
-    const normalizedEmail = email.toLowerCase();
     const user = await AdminModel.findOne({ email: normalizedEmail });
 
     if (!user) {
+      await logger.warn(`Reset password: User not found for ${normalizedEmail}`, {
+        context: "AuthController",
+      });
       return res.status(404).json({ error: "Account not found" });
-    }
-
-    if (!user.resetOtpVerified) {
-      return res.status(400).json({ error: "OTP verification is required" });
     }
 
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
-    user.resetOtpHash = null;
-    user.resetOtpExpiresAt = null;
-    user.resetOtpVerified = false;
     await user.save();
 
-    return res.status(200).json({ message: "Password reset successfully" });
+    // Invalidate Redis OTP cache after successful reset
+    await deleteCache(cacheKey);
+
+    await logger.info(`Password reset successfully and Redis cache invalidated for ${normalizedEmail}`, {
+      context: "AuthController",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully",
+    });
   } catch (error) {
-    console.error("Reset password error:", toErrorMessage(error));
+    await logger.error(
+      "Reset password error",
+      error instanceof Error ? error : { context: "AuthController", metadata: { error: toErrorMessage(error) } }
+    );
     return res.status(500).json({ error: "Failed to reset password" });
   }
 };

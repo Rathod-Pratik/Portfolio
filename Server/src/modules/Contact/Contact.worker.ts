@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { incrementCacheVersion, setCache } from "@utils";
+import { incrementCacheVersion, setCache, logger } from "@utils";
 import { contactModel } from "./contact.model.ts";
 import {
     ContactCacheKeys,
@@ -14,7 +14,6 @@ export const contactWorker = new Worker<ICreateContactJob>(
     async (job) => {
         const { name, email, mobile, message } = job.data;
 
-
         const contact = await contactModel.create({
             name,
             email,
@@ -23,6 +22,7 @@ export const contactWorker = new Worker<ICreateContactJob>(
         });
 
         if (!contact) {
+            await logger.error("Failed to create contact in database", { context: "ContactWorker" });
             throw new Error("Failed to create contact");
         }
 
@@ -34,6 +34,12 @@ export const contactWorker = new Worker<ICreateContactJob>(
             "New Contact",
             `New contact received from ${name}.`
         );
+
+        await logger.info(`Contact created with ID: ${contact._id.toString()}`, {
+            context: "ContactWorker",
+            metadata: { contactId: contact._id.toString(), email, jobId: job.id },
+        });
+
         const auth = nodemailer.createTransport({
             service: "gmail",
             secure: true,
@@ -55,6 +61,7 @@ export const contactWorker = new Worker<ICreateContactJob>(
         };
 
         await auth.sendMail(receiver);
+        await logger.info(`Contact notification email sent for ${email}`, { context: "ContactWorker" });
     },
     {
         connection: bellmqConnection,
@@ -63,21 +70,19 @@ export const contactWorker = new Worker<ICreateContactJob>(
 );
 
 contactWorker.on("completed", (job) => {
-    console.log(
-        `Contact cache job completed: ${job.id}`
-    );
+    logger.info(`Contact job completed: ${job.id}`, { context: "ContactWorker", metadata: { jobId: job.id } });
 });
 
 contactWorker.on("failed", (job, error) => {
-    console.error(
-        `Contact cache job failed: ${job?.id}`,
-        error
+    logger.error(
+        `Contact job failed: ${job?.id}`,
+        error instanceof Error ? error : { context: "ContactWorker", metadata: { jobId: job?.id, error: String(error) } }
     );
 });
 
 contactWorker.on("error", (error) => {
-    console.error(
-        "Contact worker error:",
-        error
+    logger.error(
+        "Contact worker error",
+        error instanceof Error ? error : { context: "ContactWorker", metadata: { error: String(error) } }
     );
-});
+});

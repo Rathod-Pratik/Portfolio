@@ -8,7 +8,8 @@ import {
   BlogCacheKeys,
   setCache,
   uploadWithRetry,
-  ImageFileSchema
+  ImageFileSchema,
+  logger,
 } from "@utils";
 import type { Request, Response } from "express";
 import { CreateBlogJob } from "./Blog.queue.ts";
@@ -27,6 +28,10 @@ export const createBlog = async (
   try {
     const validate = CreateBlogSchema.safeParse(req.body);
     if (!validate.success) {
+      await logger.warn("Create Blog validation failed", {
+        context: "BlogController",
+        metadata: { errors: validate.error.issues },
+      });
       return res.status(400).json({
         message: "Invalid request body",
         error: validate.error.issues,
@@ -47,6 +52,10 @@ export const createBlog = async (
     const fileValidate = ImageFileSchema.safeParse(file);
 
     if (!fileValidate.success) {
+      await logger.warn("Create Blog image validation failed", {
+        context: "BlogController",
+        metadata: { errors: fileValidate.error.issues },
+      });
       return res.status(400).json({
         message: "Invalid image file",
         error: fileValidate.error.issues,
@@ -72,23 +81,34 @@ export const createBlog = async (
       isDeleted: false,
     };
 
-    await CreateBlogJob(blogData);
-
+    const job = await CreateBlogJob(blogData);
 
     await sendInfoNotification(
       "Blog Creation",
       `Blog "${title}" was added to the creation queue and is being processed.`,
     );
 
+    await logger.info(`Blog creation queued: ${title}`, {
+      context: "BlogController",
+      metadata: { jobId: job.id, title },
+    });
+
     return res.status(201).json({
       message:
         `Blog "${title}" was added to the creation queue and is being processed.`
     });
   } catch (error) {
+    await logger.error(
+      "Failed to create blog",
+      error instanceof Error ? error : { context: "BlogController", metadata: { error: String(error) } }
+    );
     await sendDangerNotification(
       "Blog Creation Failed",
       "Failed to create blog."
     );
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 };
 
@@ -120,6 +140,7 @@ export const getBlogs = async (
       await getCache(cacheKey);
 
     if (cachedBlogs) {
+      await logger.debug("Fetched blogs from cache", { context: "BlogController" });
       return res.status(200).json({
         blog: cachedBlogs,
         'source': 'cache',
@@ -152,11 +173,17 @@ export const getBlogs = async (
       600
     );
 
+    await logger.info(`Fetched ${signedBlogs.length} blogs from database`, { context: "BlogController" });
+
     return res.status(200).json({
       blog: signedBlogs,
       'source': 'database',
     });
   } catch (error) {
+    await logger.error(
+      "Error fetching blogs",
+      error instanceof Error ? error : { context: "BlogController", metadata: { error: String(error) } }
+    );
     return res.status(500).json({
       message:
         "Error fetching blogs",
@@ -189,6 +216,7 @@ export const getBlogBySlug = async (
       await getCache(cacheKey);
 
     if (cachedBlog) {
+      await logger.debug(`Fetched blog details from cache for ID: ${id}`, { context: "BlogController" });
       return res.status(200).json({
         data: cachedBlog,
         source: "cache",
@@ -204,6 +232,7 @@ export const getBlogBySlug = async (
         .lean();
 
     if (!blog) {
+      await logger.warn(`Blog not found with ID: ${id}`, { context: "BlogController" });
       return res.status(404).json({
         message: "Blog not found",
       });
@@ -215,16 +244,23 @@ export const getBlogBySlug = async (
       });
     }
 
-    setCache(
+    await setCache(
       cacheKey,
       blog,
       600
     );
+
+    await logger.info(`Fetched blog details from database for ID: ${id}`, { context: "BlogController" });
+
     return res.status(200).json({
       data: blog,
       source: "database",
     });
   } catch (error) {
+    await logger.error(
+      "Error fetching blog by ID",
+      error instanceof Error ? error : { context: "BlogController", metadata: { error: String(error) } }
+    );
     return res.status(500).json({
       message:
         "Error fetching blog",
@@ -240,6 +276,10 @@ export const updateBlog = async (
     const validateParams = BlogIdSchema.safeParse(req.params);
 
     if (!validateParams.success) {
+      await logger.warn("Update blog invalid params", {
+        context: "BlogController",
+        metadata: { errors: validateParams.error.issues },
+      });
       return res.status(400).json({
         message: validateParams.error.issues,
       });
@@ -250,6 +290,10 @@ export const updateBlog = async (
     const validateBody = UpdateBlogSchema.safeParse(req.body);
 
     if (!validateBody.success) {
+      await logger.warn("Update blog invalid body", {
+        context: "BlogController",
+        metadata: { errors: validateBody.error.issues },
+      });
       return res.status(400).json({
         message: validateBody.error.issues,
       });
@@ -268,6 +312,10 @@ export const updateBlog = async (
     const fileValidate = ImageFileSchema.safeParse(file);
 
     if (!fileValidate.success) {
+      await logger.warn("Update blog invalid image file", {
+        context: "BlogController",
+        metadata: { errors: fileValidate.error.issues },
+      });
       return res.status(400).json({
         message: fileValidate.error.issues,
       });
@@ -279,6 +327,7 @@ export const updateBlog = async (
     });
 
     if (!blog) {
+      await logger.warn(`Update blog: Blog not found with ID: ${id}`, { context: "BlogController" });
       return res.status(404).json({
         message: "Blog not found",
       });
@@ -296,7 +345,7 @@ export const updateBlog = async (
       image = uploadedFile.key;
     }
 
-    await CreateBlogJob({
+    const job = await CreateBlogJob({
       _id: id,
       title: title ? title : blog.title,
       slug: slug ? slug : blog.slug,
@@ -309,13 +358,22 @@ export const updateBlog = async (
 
     await sendInfoNotification(
       "Blog Update",
-      `Blog "${title}" was added to the update queue and is being processed.`,
+      `Blog "${title || blog.title}" was added to the update queue and is being processed.`,
     );
+
+    await logger.info(`Blog update queued for ID: ${id}`, {
+      context: "BlogController",
+      metadata: { jobId: job.id, blogId: id },
+    });
 
     return res.status(202).json({
       message: "Blog update added to processing queue",
     });
   } catch (error) {
+    await logger.error(
+      "Failed to update blog",
+      error instanceof Error ? error : { context: "BlogController", metadata: { error: String(error) } }
+    );
     await sendDangerNotification(
       "Blog Update Failed",
       "Failed to update blog.",
@@ -339,6 +397,10 @@ export const deleteBlog = async (
 
     const validate = BlogIdSchema.safeParse(req.params);
     if (!validate.success) {
+      await logger.warn("Delete blog invalid params", {
+        context: "BlogController",
+        metadata: { errors: validate.error.issues },
+      });
       return res.status(400).json({
         message: validate.error.issues,
       });
@@ -349,6 +411,7 @@ export const deleteBlog = async (
         id
       );
     if (!deletedBlog) {
+      await logger.warn(`Delete blog: Blog not found with ID: ${id}`, { context: "BlogController" });
       return res.status(404).json({
         message: "Blog not found",
       });
@@ -367,11 +430,20 @@ export const deleteBlog = async (
       `Blog "${deletedBlog.title}" was deleted successfully.`
     );
 
+    await logger.info(`Blog deleted successfully: ${deletedBlog.title} (ID: ${id})`, {
+      context: "BlogController",
+      metadata: { blogId: id },
+    });
+
     return res.status(200).json({
       message:
         "Blog deleted successfully",
     });
   } catch (error) {
+    await logger.error(
+      "Failed to delete blog",
+      error instanceof Error ? error : { context: "BlogController", metadata: { error: String(error) } }
+    );
     await sendDangerNotification(
       "Blog Deletion Failed",
       "Failed to delete blog."
@@ -382,4 +454,4 @@ export const deleteBlog = async (
         "Error deleting blog"
     });
   }
-};
+};

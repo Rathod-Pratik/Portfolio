@@ -3,6 +3,7 @@ import {
     Get_Signed_Url,
     getUploadedFile,
     uploadFileToS3,
+    logger,
 } from "@utils";
 import type { Request, Response } from "express";
 import {
@@ -18,6 +19,7 @@ export const AddCV = async (
         const file = getUploadedFile(req);
 
         if (!file) {
+            await logger.warn("AddCV missing file", { context: "ResumeController" });
             return res.status(400).send("CV file is required");
         }
 
@@ -32,13 +34,22 @@ export const AddCV = async (
             CV: uploadedFile.key,
         });
 
+        await logger.info("CV creation job added successfully", {
+            context: "ResumeController",
+            metadata: { jobId: job.id },
+        });
+
         return res.status(202).json({
             success: true,
             message: "CV creation job added successfully",
             jobId: job.id,
         });
     } catch (error) {
-        return res.status(400).json({
+        await logger.error(
+            "AddCV error",
+            error instanceof Error ? error : { context: "ResumeController", metadata: { error: String(error) } }
+        );
+        return res.status(500).json({
             success: false,
             message: "Something went wrong",
         });
@@ -57,6 +68,7 @@ export const UpdateCV = async (
         const file = getUploadedFile(req);
 
         if (!_id) {
+            await logger.warn("UpdateCV missing _id", { context: "ResumeController" });
             return res.status(400).json({
                 success: false,
                 message: "_id is required",
@@ -64,6 +76,7 @@ export const UpdateCV = async (
         }
 
         if (!file) {
+            await logger.warn("UpdateCV missing file", { context: "ResumeController" });
             return res.status(400).json({
                 success: false,
                 message: "CV file is required",
@@ -73,6 +86,7 @@ export const UpdateCV = async (
         const existingCV = await CVmodel.findById(_id);
 
         if (!existingCV) {
+            await logger.warn(`UpdateCV: CV not found for ID: ${_id}`, { context: "ResumeController" });
             return res.status(404).json({
                 success: false,
                 message: "CV not found",
@@ -93,13 +107,21 @@ export const UpdateCV = async (
             }
         );
 
+        await logger.info(`CV update queued for ID: ${_id}`, {
+            context: "ResumeController",
+            metadata: { jobId: job.id, resumeId: _id },
+        });
+
         return res.status(202).json({
             success: true,
             message: "CV update job added successfully",
             jobId: job.id,
         });
     } catch (error) {
-        console.error("Error in UpdateCV:", error);
+        await logger.error(
+            "UpdateCV error",
+            error instanceof Error ? error : { context: "ResumeController", metadata: { error: String(error) } }
+        );
 
         return res.status(500).json({
             success: false,
@@ -116,6 +138,7 @@ export const GetCV = async (
         const cv = await CVmodel.findOne();
 
         if (!cv?.CV) {
+            await logger.warn("GetCV: CV not found", { context: "ResumeController" });
             return res.status(404).json({
                 success: false,
                 message: "CV not found",
@@ -126,14 +149,20 @@ export const GetCV = async (
             key: cv.CV,
         });
 
+        await logger.info("Fetched CV signed URL", { context: "ResumeController" });
+
         return res.status(200).json({
             success: true,
             data: signedCv,
         });
     } catch (error) {
-        return res.status(400).json({
+        await logger.error(
+            "GetCV error",
+            error instanceof Error ? error : { context: "ResumeController", metadata: { error: String(error) } }
+        );
+        return res.status(500).json({
             success: false,
             message: "Something went wrong",
         });
     }
-};
+};

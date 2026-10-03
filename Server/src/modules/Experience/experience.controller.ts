@@ -9,6 +9,7 @@ import {
     getCacheVersion,
     incrementCacheVersion,
     ExperienceCacheKeys,
+    logger,
 } from "@utils";
 import {
     addCreateExperienceJob,
@@ -25,6 +26,10 @@ export const createExperience = async (
         const validate = CreateExperienceSchema.safeParse(req.body);
 
         if (!validate.success) {
+            await logger.warn("Create experience validation failed", {
+                context: "ExperienceController",
+                metadata: { errors: validate.error.issues },
+            });
             return res.status(400).json({
                 message: validate.error.issues,
             });
@@ -46,17 +51,26 @@ export const createExperience = async (
             description,
         };
 
-        await addCreateExperienceJob(data);
+        const job = await addCreateExperienceJob(data);
 
         await sendInfoNotification(
             "Experience Creation",
             `Experience "${title}" was added to the creation queue and is being processed.`
         );
 
+        await logger.info(`Experience creation queued: ${title}`, {
+            context: "ExperienceController",
+            metadata: { jobId: job.id, title, company },
+        });
+
         return res.status(202).json({
             message: `Experience "${title}" was added to the creation queue and is being processed.`,
         });
     } catch (error) {
+        await logger.error(
+            "Create experience error",
+            error instanceof Error ? error : { context: "ExperienceController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             message: "Internal server error",
         });
@@ -91,11 +105,11 @@ export const getExperiences = async (
             await getCache(cacheKey);
 
         if (cachedExperiences) {
+            await logger.debug("Fetched experiences from cache", { context: "ExperienceController" });
             return res.status(200).json({
                 data: cachedExperiences,
                 source: "cache",
-            }
-            );
+            });
         }
 
         const skip = (page - 1) * limit;
@@ -112,12 +126,17 @@ export const getExperiences = async (
             experiences
         );
 
+        await logger.info(`Fetched ${experiences.length} experiences from database`, { context: "ExperienceController" });
+
         return res.status(200).json({
             data: experiences,
             source: "database",
-        }
-        );
+        });
     } catch (error) {
+        await logger.error(
+            "Get experiences error",
+            error instanceof Error ? error : { context: "ExperienceController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             message: "Internal server error"
         });
@@ -131,6 +150,10 @@ export const getExperienceById = async (
     try {
         const validate = ExperienceIdSchema.safeParse(req.params);
         if (!validate.success) {
+            await logger.warn("Get experience by ID validation failed", {
+                context: "ExperienceController",
+                metadata: { errors: validate.error.issues },
+            });
             return res.status(400).json({
                 message: validate.error.issues,
             });
@@ -152,6 +175,7 @@ export const getExperienceById = async (
             await getCache(cacheKey);
 
         if (cachedExperience) {
+            await logger.debug(`Fetched experience from cache for ID: ${id}`, { context: "ExperienceController" });
             return res.status(200).json({
                 data: cachedExperience,
                 source: "cache"
@@ -162,6 +186,7 @@ export const getExperienceById = async (
             await ExperienceModel.findOne({ _id: id, isDeleted: false }).lean();
 
         if (!experience) {
+            await logger.warn(`Experience not found with ID: ${id}`, { context: "ExperienceController" });
             return res.status(404).json({
                 message: "Experience not found",
             });
@@ -172,11 +197,17 @@ export const getExperienceById = async (
             experience
         );
 
+        await logger.info(`Fetched experience from database for ID: ${id}`, { context: "ExperienceController" });
+
         return res.status(200).json({
             data: experience,
             source: "database"
         });
     } catch (error) {
+        await logger.error(
+            "Get experience by ID error",
+            error instanceof Error ? error : { context: "ExperienceController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             message: "Internal server error",
         });
@@ -191,12 +222,20 @@ export const updateExperience = async (
         const validate = UpdateExperienceSchema.safeParse(req.body);
 
         if (!validate.success) {
+            await logger.warn("Update experience validation failed", {
+                context: "ExperienceController",
+                metadata: { errors: validate.error.issues },
+            });
             return res.status(400).json({
                 message: validate.error.issues,
             });
         }
         const ValidateId = ExperienceIdSchema.safeParse(req.params);
         if (!ValidateId.success) {
+            await logger.warn("Update experience invalid ID param", {
+                context: "ExperienceController",
+                metadata: { errors: ValidateId.error.issues },
+            });
             return res.status(400).json({
                 message: ValidateId.error.issues,
             });
@@ -215,12 +254,13 @@ export const updateExperience = async (
             await ExperienceModel.findOne({ _id: id, isDeleted: false }).lean();
 
         if (!existingExperience) {
+            await logger.warn(`Update experience: Not found for ID: ${id}`, { context: "ExperienceController" });
             return res.status(404).json({
                 message: "Experience not found",
             });
         }
 
-        await addUpdateExperienceJob(
+        const job = await addUpdateExperienceJob(
             id,
             {
                 year: year ? year : existingExperience.year,
@@ -233,13 +273,22 @@ export const updateExperience = async (
 
         await sendInfoNotification(
             "Experience Update",
-            `Experience "${title}" was added to the update queue and is being processed.`
+            `Experience "${title || existingExperience.title}" was added to the update queue and is being processed.`
         );
 
+        await logger.info(`Experience update queued for ID: ${id}`, {
+            context: "ExperienceController",
+            metadata: { jobId: job.id, experienceId: id },
+        });
+
         return res.status(202).json({
-            message: `Experience "${title}" was added to the update queue and is being processed.`,
+            message: `Experience "${title || existingExperience.title}" was added to the update queue and is being processed.`,
         });
     } catch (error) {
+        await logger.error(
+            "Update experience error",
+            error instanceof Error ? error : { context: "ExperienceController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             message: "Internal server error"
         });
@@ -253,6 +302,10 @@ export const deleteExperience = async (
     try {
         const validate = ExperienceIdSchema.safeParse(req.params);
         if (!validate.success) {
+            await logger.warn("Delete experience invalid ID param", {
+                context: "ExperienceController",
+                metadata: { errors: validate.error.issues },
+            });
             return res.status(400).json({
                 message: validate.error.issues,
             });
@@ -263,6 +316,7 @@ export const deleteExperience = async (
             await ExperienceModel.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
 
         if (!experience) {
+            await logger.warn(`Delete experience: Not found for ID: ${id}`, { context: "ExperienceController" });
             return res.status(404).json({
                 message: "Experience not found",
             });
@@ -281,12 +335,18 @@ export const deleteExperience = async (
             `Experience "${experience.title}" was deleted successfully.`
         );
 
+        await logger.info(`Experience deleted for ID: ${id}`, { context: "ExperienceController" });
+
         return res.status(200).json({
             message: "Experience deleted successfully",
         });
     } catch (error) {
+        await logger.error(
+            "Delete experience error",
+            error instanceof Error ? error : { context: "ExperienceController", metadata: { error: String(error) } }
+        );
         return res.status(500).json({
             message: "Internal server error"
         });
     }
-};
+};
