@@ -9,11 +9,11 @@ export const CreateExperienceSchema = z.object({
 });
 
 export const UpdateExperienceSchema = z.object({
-    year: z.string().min(1, "Year is required"),
-    duration: z.string().min(1, "Duration is required"),
-    title: z.string().min(1, "Title is required"),
-    company: z.string().min(1, "Company is required"),
-    description: z.string().min(1, "Description is required"),
+    year: z.string().min(1, "Year is required").optional(),
+    duration: z.string().min(1, "Duration is required").optional(),
+    title: z.string().min(1, "Title is required").optional(),
+    company: z.string().min(1, "Company is required").optional(),
+    description: z.string().min(1, "Description is required").optional(),
 });
 
 export const ExperienceIdSchema = z.object({

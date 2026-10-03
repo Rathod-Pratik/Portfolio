@@ -42,7 +42,8 @@ export const EditProjectSchema = z.object({
     description: z
         .string()
         .trim()
-        .min(1, 'Description is required'),
+        .min(1, 'Description cannot be empty')
+        .optional(),
     difficult: z
         .string()
         .trim()

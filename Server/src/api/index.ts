@@ -25,6 +25,7 @@ import LoggerRoutes from '@modules/Logger/Logger.routes.ts';
 import cookieParser from "cookie-parser";
 
 import { ConnectToMongoDB } from '@utils';
+import { connectRedis } from "@config/redis.ts";
 
 const app = express();
 app.use(cookieParser());
@@ -51,6 +52,7 @@ if (!databaseUri) {
 }
 
 ConnectToMongoDB(databaseUri);
+connectRedis();
 app.use(express.json());
 
 app.get("/", (req, res) => {

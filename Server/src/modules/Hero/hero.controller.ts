@@ -104,19 +104,6 @@ export const updateHero = async (
             description,
         } = validate.data;
 
-        const file = getUploadedFile(req);
-        const validateFile = ImageFileSchema.safeParse(file);
-
-        if (!validateFile.success) {
-            await logger.warn("Update hero image validation failed", {
-                context: "HeroController",
-                metadata: { errors: validateFile.error.issues },
-            });
-            return res.status(400).json({
-                message: validateFile.error.issues,
-            });
-        }
-
         const hero = await HeroModel.findOne().lean();
 
         if (!hero) {
@@ -126,8 +113,22 @@ export const updateHero = async (
             });
         }
 
+        const file = getUploadedFile(req);
         let image;
+
         if (file) {
+            const validateFile = ImageFileSchema.safeParse(file);
+
+            if (!validateFile.success) {
+                await logger.warn("Update hero image validation failed", {
+                    context: "HeroController",
+                    metadata: { errors: validateFile.error.issues },
+                });
+                return res.status(400).json({
+                    message: validateFile.error.issues,
+                });
+            }
+
             const uploadedFile =
                 await uploadWithRetry(validateFile.data as Express.Multer.File, 3, "Hero");
 

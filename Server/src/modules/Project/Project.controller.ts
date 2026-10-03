@@ -27,9 +27,18 @@ export const CreateProject = async (
     const {
       title,
       subtitle,
+      description,
       difficult
     } = validation.data;
     const file = getUploadedFile(req);
+
+    if (!file) {
+      await logger.warn("Create project image missing", { context: "ProjectController" });
+      return res.status(400).json({
+        success: false,
+        message: 'Image file is required',
+      });
+    }
 
     const uploadedFile = await uploadFileToS3({
       buffer: file.buffer,
@@ -177,6 +186,7 @@ export const EditProject = async (
       _id,
       title,
       subtitle,
+      description,
     } = validation.data;
     const file = getUploadedFile(req);
 
@@ -190,6 +200,7 @@ export const EditProject = async (
     if (title) EditData.title = title;
     if (difficult) EditData.difficult = difficult;
     if (subtitle) EditData.subtitle = subtitle;
+    if (description) EditData.description = description;
 
     if (file) {
       const uploadedFile = await uploadFileToS3({

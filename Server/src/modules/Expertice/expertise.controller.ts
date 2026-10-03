@@ -143,11 +143,12 @@ export const getExpertise = async (
 
         const signedExpertise =
             await Promise.all(
-                expertise.map((item) =>
-                    item.image
-                        ? Get_Signed_Url({ key: item.image })
-                        : null
-                )
+                expertise.map(async (item) => ({
+                    ...item,
+                    image: item.image
+                        ? await Get_Signed_Url({ key: item.image })
+                        : null,
+                }))
             );
 
         await setCache(
@@ -288,20 +289,6 @@ export const updateExpertise = async (
         }
         const { id } = validateId.data;
 
-        const file = getUploadedFile(req);
-
-        const validateFile = ImageFileSchema.safeParse(file);
-
-        if (!validateFile.success) {
-            await logger.warn("Update expertise invalid image file", {
-                context: "ExpertiseController",
-                metadata: { errors: validateFile.error.issues },
-            });
-            return res.status(400).json({
-                message: validateFile.error.issues,
-            });
-        }
-
         const Expertise =
             await ExpertiseModel.findOne({ _id: id, isDeleted: false });
 
@@ -311,12 +298,25 @@ export const updateExpertise = async (
                 message: "Expertise not found",
             });
         }
-        let image;
-        if (file) {
-            const uploadedFile = await uploadWithRetry(validateFile.data as Express.Multer.File, 3, "Expertise");
 
-            image =
-                uploadedFile.key;
+        const file = getUploadedFile(req);
+        let image;
+
+        if (file) {
+            const validateFile = ImageFileSchema.safeParse(file);
+
+            if (!validateFile.success) {
+                await logger.warn("Update expertise invalid image file", {
+                    context: "ExpertiseController",
+                    metadata: { errors: validateFile.error.issues },
+                });
+                return res.status(400).json({
+                    message: validateFile.error.issues,
+                });
+            }
+
+            const uploadedFile = await uploadWithRetry(validateFile.data as Express.Multer.File, 3, "Expertise");
+            image = uploadedFile.key;
         }
 
         const job =

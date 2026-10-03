@@ -308,19 +308,6 @@ export const updateBlog = async (
       isPublished,
     } = validateBody.data;
 
-    const file = getUploadedFile(req);
-    const fileValidate = ImageFileSchema.safeParse(file);
-
-    if (!fileValidate.success) {
-      await logger.warn("Update blog invalid image file", {
-        context: "BlogController",
-        metadata: { errors: fileValidate.error.issues },
-      });
-      return res.status(400).json({
-        message: fileValidate.error.issues,
-      });
-    }
-
     const blog = await blogModel.findOne({
       _id: id,
       isDeleted: false,
@@ -333,9 +320,22 @@ export const updateBlog = async (
       });
     }
 
-    let image;
+    const file = getUploadedFile(req);
+    let image: string | undefined;
 
     if (file) {
+      const fileValidate = ImageFileSchema.safeParse(file);
+
+      if (!fileValidate.success) {
+        await logger.warn("Update blog invalid image file", {
+          context: "BlogController",
+          metadata: { errors: fileValidate.error.issues },
+        });
+        return res.status(400).json({
+          message: fileValidate.error.issues,
+        });
+      }
+
       const uploadedFile = await uploadWithRetry(
         fileValidate.data as Express.Multer.File,
         3,

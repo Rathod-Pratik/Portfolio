@@ -20,7 +20,10 @@ export const AddCV = async (
 
         if (!file) {
             await logger.warn("AddCV missing file", { context: "ResumeController" });
-            return res.status(400).send("CV file is required");
+            return res.status(400).json({
+                success: false,
+                message: "CV file is required",
+            });
         }
 
         const uploadedFile = await uploadFileToS3({
