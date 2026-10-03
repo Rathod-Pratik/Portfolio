@@ -1,55 +1,84 @@
-import { useEffect, useState } from "react";
+'use client';
+
 import { toast } from "react-toastify";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
 import { apiClient } from "@apiClient";
 import { GET_ABOUT, UPDATE_ABOUT } from "@api";
 import { Input, Loading } from "@components";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 
+type AboutData = {
+    _id: string;
+    content: string;
+    createdAt: string;
+    updatedAt: string;
+};
+
+type AboutResponse = {
+    data: AboutData;
+    source: "cache" | "database";
+};
+
 type AboutType = {
-    content: string
-}
+    content: string;
+};
+
+type ApiError = {
+    message?: string;
+};
 
 const About = () => {
     const queryClient = useQueryClient();
-    const [content, setContent] = useState("");
-    const [saving, setSaving] = useState(false);
 
-    const FetchAbout = async () => {
-        const response = await apiClient.get(GET_ABOUT);
-        return response.data;
-    }
+    const fetchAbout = async (): Promise<AboutData | null> => {
+        try {
+            const response = await apiClient.get<AboutResponse>(GET_ABOUT);
+            return response.data.data;
+        } catch (error) {
+            const apiError = error as AxiosError<ApiError>;
 
-    const { data, isLoading } = useQuery({
-        queryKey: ["about"],
-        queryFn: FetchAbout,
-    });
+            if (apiError.response?.status === 404) {
+                return null;
+            }
 
-    useEffect(() => {
-        if (data) {
-            setContent(data.content || "");
+            throw error;
         }
-    }, [data]);
+    };
+
+    const { data, isLoading, isError } = useQuery({
+        queryKey: ["about"],
+        queryFn: fetchAbout,
+    });
 
     const formik = useFormik<AboutType>({
         enableReinitialize: true,
         initialValues: {
-            content: content
+            content: data?.content || ""
         },
         validationSchema: Yup.object({
-            content: Yup.string().required("Content is required"),
+            content: Yup.string()
+                .min(1, "Content is required")
+                .required("Content is required"),
         }),
         onSubmit: async (values, { setSubmitting }) => {
             try {
-                await apiClient.put(UPDATE_ABOUT, { content }, { withCredentials: true });
+                await apiClient.put(UPDATE_ABOUT, { content: values.content }, { withCredentials: true });
                 queryClient.invalidateQueries({ queryKey: ["about"] });
                 toast.success("About section updated successfully!");
-            } catch (error: any) {
-                if (error.response?.status === 403) {
+            } catch (error) {
+                const apiError = error as AxiosError<ApiError>;
+
+                if (apiError.response?.status === 403) {
                     toast.error("Access denied. Please login as admin.");
+                } else if (apiError.response?.status === 401) {
+                    toast.error("Your admin session has expired. Please login again.");
                 } else {
-                    toast.error("Failed to update About section.");
+                    toast.error(
+                        apiError.response?.data?.message ||
+                        "Failed to update About section."
+                    );
                 }
                 console.error(error);
             } finally {
@@ -81,6 +110,14 @@ const About = () => {
         );
     }
 
+    if (isError) {
+        return (
+            <div className="p-6 text-red-400">
+                Unable to load About information. Please try again.
+            </div>
+        );
+    }
+
     return (
         <div className="p-6  mx-auto">
             <div className="flex justify-between items-center mb-6">
@@ -99,7 +136,7 @@ const About = () => {
                     type="text"
                     name="Content"
                     lable=" About Content (Markdown supported)"
-                    value={content}
+                    value={formik.values.content}
                     onChange={(value) => formik.setFieldValue('content', value)}
                     onBlur={() => formik.setFieldTouched('content', true)}
                     inputType='textarea'
@@ -107,7 +144,7 @@ const About = () => {
                 />
                 <div className="mt-4 text-sm text-gray-400 flex justify-between">
                     <span>You can use markdown formatting: **bold**, *italic*, [links](url), etc.</span>
-                    <span>{content.length} characters</span>
+                    <span>{formik.values.content.length} characters</span>
                 </div>
             </div>
         </div>

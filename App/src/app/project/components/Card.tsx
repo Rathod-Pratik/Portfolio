@@ -20,7 +20,7 @@ const Card = ({ item, routerPush }: ProjectCardExtraProps) => {
             <div className="flex flex-col items-center p-6 h-full">
                 <div className="relative w-full h-44 mb-4 rounded-lg overflow-hidden">
                     <Image
-                        src={item.images}
+                        src={item.image || item.images}
                         alt={item.title}
                         fill
                         unoptimized
@@ -29,6 +29,12 @@ const Card = ({ item, routerPush }: ProjectCardExtraProps) => {
                         style={{ objectFit: 'cover' }}
                     />
                 </div>
+
+                {item.difficult && (
+                    <span className="mb-2 rounded-full bg-purple-500/20 px-3 py-1 text-xs text-purple-200">
+                        {item.difficult}
+                    </span>
+                )}
 
                 <h5 className="mb-2 text-xl font-medium text-gray-900 dark:text-white text-center">
                     {item.title}

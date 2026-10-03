@@ -1,3 +1,4 @@
+"use client";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -7,11 +8,6 @@ import { DELETE_PROJECT, GET_PROJECT } from "@api";
 import apiClient from "@apiClient";
 import { Loading } from "@components";
 import type { AxiosError } from "axios";
-import type { ProjectItem } from "@Type";
-
-type GetProjectsResponse = {
-  data: ProjectItem[];
-};
 
 const Projects = () => {
   const router = useRouter();
@@ -22,7 +18,7 @@ const Projects = () => {
   const { data: projects = [], isLoading: loading } = useQuery({
     queryKey: ["projects"],
     queryFn: async () => {
-      const response = await apiClient.get<GetProjectsResponse>(GET_PROJECT, {
+      const response = await apiClient.get(`${GET_PROJECT}?page=1&limit=100`, {
         withCredentials: true,
       });
       return response.data.data ?? [];
@@ -58,7 +54,7 @@ const Projects = () => {
       const apiError = error as AxiosError;
       if (apiError.response?.status === 403) {
         toast.error("Access denied. Please login as admin.");
-        router.push("/login");
+        router.push("/Auth/Login");
         return;
       }
 
@@ -80,7 +76,7 @@ const Projects = () => {
           className="border-2 text-gray-500 outline-none rounded-md px-4 py-2 w-[90%]"
         />
         <button
-          onClick={() => router.push("/admin/project/create")}
+          onClick={() => router.push("/Dashboard/Project/create")}
           className="text-white bg-blue-500 px-5 py-2 rounded-md cursor-pointer"
         >
           New
@@ -101,7 +97,7 @@ const Projects = () => {
             >
               <div className="flex justify-center p-4 bg-gray-100 dark:bg-slate-700">
                 <img
-                  src={item.images}
+                  src={item.image || item.images}
                   className="w-full h-48 object-contain rounded-t-lg"
                   alt={item.title}
                 />
@@ -145,7 +141,7 @@ const Projects = () => {
 
                 <div className="flex justify-center space-x-3 border-t pt-4">
                   <button
-                    onClick={() => router.push(`/admin/project/edit/${item._id}`)}
+                    onClick={() => router.push(`/Dashboard/Project/${item._id}`)}
                     className="flex items-center px-4 py-2 border border-blue-500 text-blue-500 dark:text-blue-400 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                     title="Edit"
                   >

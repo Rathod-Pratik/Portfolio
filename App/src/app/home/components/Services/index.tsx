@@ -32,7 +32,7 @@ const Services = ({ data }: ServicesProps) => {
         {data.map((exp, index) => (
           <div
             key={exp._id || index}
-            className="group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#111827] to-[#1f2937] p-6 sm:p-8 shadow-lg transition-all duration-500 hover:-translate-y-2 hover:border-purple-500/40 hover:shadow-purple-500/20"
+            className="group relative overflow-hidden rounded-3xl border border-white/10 bg-linear-to-br from-[#111827] to-[#1f2937] p-6 sm:p-8 shadow-lg transition-all duration-500 hover:-translate-y-2 hover:border-purple-500/40 hover:shadow-purple-500/20"
           >
             {/* Glow Effect */}
             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500 bg-purple-500/10 blur-3xl" />
@@ -42,15 +42,19 @@ const Services = ({ data }: ServicesProps) => {
               <div className="relative">
                 <div className="absolute inset-0 bg-purple-500 blur-2xl opacity-20 rounded-full" />
 
-                <Image
-                  className="relative w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-2xl border border-white/10"
-                  src={exp.image}
-                  alt={exp.title}
-                  width={112}
-                  height={112}
-                  unoptimized
-                  loading="eager"
-                />
+                {exp.image ? (
+                  <Image
+                    className="relative w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-2xl border border-white/10"
+                    src={exp.image}
+                    alt={exp.title}
+                    width={112}
+                    height={112}
+                    unoptimized
+                    loading="eager"
+                  />
+                ) : (
+                  <div className="relative h-24 w-24 rounded-2xl border border-white/10 bg-slate-800 sm:h-28 sm:w-28" />
+                )}
               </div>
             </div>
 

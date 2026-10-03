@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -12,6 +14,7 @@ export type BlogType = {
   slug: string;
   isPublished?: boolean;
   coverImage?: string;
+  image?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -24,7 +27,7 @@ const Blogs = () => {
   const { data: blogs = [], isLoading: loading } = useQuery<BlogType[]>({
     queryKey: ["blogs"],
     queryFn: async () => {
-      const response = await apiClient.get(GET_BLOG);
+      const response = await apiClient.get(`${GET_BLOG}?page=1&limit=100`);
       return response.data.blog ?? [];
     },
   });
@@ -44,7 +47,7 @@ const Blogs = () => {
         toast.success("Blog Deleted Successfully");
         queryClient.invalidateQueries({ queryKey: ["blogs"] });
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete blog");
     }
   };
@@ -99,7 +102,7 @@ const Blogs = () => {
               {blog.coverImage && (
                 <div className="relative overflow-hidden">
                   <img
-                    src={blog.coverImage}
+                    src={blog.image ?? blog.coverImage}
                     alt={blog.title}
                     className="h-56 w-full object-cover transition-transform duration-700 group-hover:scale-110"
                   />

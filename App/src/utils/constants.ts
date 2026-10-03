@@ -7,6 +7,7 @@ export const LOGOUT = "auth/logout";
 export const FORGOT_PASSWORD = "auth/forgot-password";
 export const VERIFY_OTP = "auth/verify-otp";
 export const RESET_PASSWORD = "auth/reset-password";
+export const CHECK_AUTH = "auth/check";
 export const CONTACT_FORM = `${HOST}/api/form`;
 
 // File endpoints
@@ -21,10 +22,10 @@ export const UPDATE_LANGUAGE = "language/editlanguage";
 export const DELETE_LANGUAGE = "language/deletelanguage";
 
 // Skill endpoints
-export const CREATE_SKILL = "skills/createskill";
-export const GET_SKILL = "skills/getskills";
-export const UPDATE_SKILL = "skills/editskills";
-export const DELETE_SKILL = "skills/deleteskill";
+export const CREATE_SKILL = "skills";
+export const GET_SKILL = "skills";
+export const UPDATE_SKILL = "skills";
+export const DELETE_SKILL = "skills";
 
 // Note endpoints
 export const GET_NOTES = "note/getnotes";
@@ -36,20 +37,20 @@ export const DELETE_NOTES = "note/deleteNote";
 export const GET_CONTACT_OPTIONS = "contact/options";
 export const GET_CONTACT = "contact/getcontact";
 export const CREATE_CONTACT = "contact/createcontact";
+export const UPDATE_CONTACT_STATUS = "contact/updatecontactstatus";
 export const DELETE_CONTACT = "contact/deletecontact";
 
 // CV endpoints
-export const GET_CV = "CV/GetCV";
-export const DOWNLOAD_CV = "/CV/download-url";
-export const CREATE_CV = "CV/AddCV";
-export const UPDATE_CV = "CV/UpdateCV";
+export const GET_CV = "CV";
+export const CREATE_CV = "CV";
+export const UPDATE_CV = "CV";
 
 // Project endpoints
-export const CREATE_PROJECT = "project/createProject";
-export const GET_PROJECT = "project/getProject";
-export const EDIT_PROJECT = "project/editProject";
-export const DELETE_PROJECT = "project/deleteProject";
-export const GET_PROJECT_DATA = "project/projectdata";
+export const CREATE_PROJECT = "project";
+export const GET_PROJECT = "project";
+export const EDIT_PROJECT = "project";
+export const DELETE_PROJECT = "project";
+export const GET_PROJECT_DATA = "project";
 
 // Blog endpoints
 export const CREATE_BLOG = "blogs/create";
@@ -72,6 +73,18 @@ export const DELETE_EXPERIENCE = "experiences";
 // Hero endpoints
 export const GET_HERO = "hero";
 export const UPDATE_HERO = "hero";
+
+// Logger endpoints
+export const GET_LOGS = "logger";
+export const DELETE_LOG = "logger";
+export const CLEAR_LOGS = "logger/all";
+
+// Notification endpoints
+export const GET_NOTIFICATIONS = "notifications";
+export const MARK_NOTIFICATION_READ = "notifications";
+export const MARK_ALL_NOTIFICATIONS_READ = "notifications/read-all";
+export const DELETE_NOTIFICATION = "notifications";
+export const CLEAR_NOTIFICATIONS = "notifications/all";
 
 // Expertise endpoints
 export const CREATE_EXPERTISE = "expertise";

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import type { AxiosError } from 'axios';
 import { apiClient } from '@/lib/api-client';
 import { GET_ABOUT } from '@/utils/constants';
 import ReactMarkdown from 'react-markdown';
@@ -9,7 +10,10 @@ import { motion } from 'framer-motion';
 import MarkDown from './components/MarkDown';
 
 type AboutResponse = {
-  content: string;
+  data: {
+    content: string;
+  };
+  source: 'cache' | 'database';
 };
 
 export default function About() {
@@ -21,8 +25,15 @@ export default function About() {
       try {
         setLoading(true);
         const response = await apiClient.get<AboutResponse>(GET_ABOUT);
-        setContent(response.data.content || '');
+        setContent(response.data.data.content || '');
       } catch (error) {
+        const apiError = error as AxiosError;
+
+        if (apiError.response?.status === 404) {
+          setContent('');
+          return;
+        }
+
         console.error('Error fetching about data:', error);
       } finally {
         setLoading(false);

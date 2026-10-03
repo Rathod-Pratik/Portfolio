@@ -10,7 +10,7 @@ interface CardProps {
 }
 
 const Card: React.FC<CardProps> = ({ item }) => {
-  const coverImage = item.coverImage?.trim() ?? '';
+  const coverImage = (item.image)?.trim() ?? '';
 
   return (
     <article className="group relative flex w-full max-w-105 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-sm backdrop-blur transition duration-200 hover:-translate-y-0.5 hover:shadow-xl">
@@ -63,6 +63,15 @@ const Card: React.FC<CardProps> = ({ item }) => {
             ? item.excerpt.substring(0, 120) + '...'
             : item.excerpt}
         </p>
+
+        {item.createdAt && (
+          <time
+            dateTime={item.createdAt}
+            className="text-xs text-white/50"
+          >
+            {new Date(item.createdAt).toLocaleDateString()}
+          </time>
+        )}
 
         <div className="mt-auto" />
 

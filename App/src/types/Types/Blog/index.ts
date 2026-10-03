@@ -15,6 +15,7 @@ export type AdminBlogItem = {
   content?: string;
   isPublished?: boolean;
   coverImage?: string;
+  image?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -42,6 +43,7 @@ export type CreateOrUpdateBlogPayload = {
 
 export type GetBlogsResponse = {
   blog: AdminBlogItem[];
+  source?: "cache" | "database";
 };
 
 export type SignedUrlResponse = {

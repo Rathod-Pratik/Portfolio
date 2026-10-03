@@ -7,6 +7,8 @@ type ContactUsItem = {
 	budget: string;
 	status: "new" | "contacted" | "inProgress" | "closed";
 	message: string;
+	createdAt?: string;
+	updatedAt?: string;
 };
 
 type ContactFormOptions = {
@@ -17,6 +19,7 @@ type ContactFormOptions = {
 type GetContactResponse = {
 	success: boolean;
 	data: ContactUsItem[];
+	source?: "cache" | "database";
 };
 
 type GetContactFormOptionsResponse = {

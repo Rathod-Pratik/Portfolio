@@ -1,7 +1,7 @@
 import type { ExperienceProps } from "@Type";
 
 const Experience = ({ data }: ExperienceProps) => {
-  if (data.length === 0 ) return null;
+  if (data.length === 0) return null;
 
   return (
     <div className="p-4 md:p-8 lg:px-20 lg:py-16  mx-auto">

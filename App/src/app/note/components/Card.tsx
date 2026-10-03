@@ -5,7 +5,11 @@ import { DownloadFile } from '@utils/Functions';
 import type { NoteCardProps } from '@Type';
 
 const resolveAssetUrl = (...values: Array<string | undefined>) => {
-  return values.find((value) => typeof value === 'string' && value.trim().length > 0)?.trim() ?? '';
+  return (
+    values.find(
+      (value) => typeof value === 'string' && value.trim().length > 0,
+    )?.trim() ?? ''
+  );
 };
 
 const Card = ({ item }: NoteCardProps) => {
@@ -14,34 +18,38 @@ const Card = ({ item }: NoteCardProps) => {
 
   return (
     <div
-      className="w-full max-w-none sm:max-w-75 min-h-50 sm:min-h-77.5 rounded-lg border shadow-md bg-slate-800 border-black flex flex-col items-center p-3 sm:p-6 overflow-hidden"
+        className="h-72 lg:w-80 rounded-lg border shadow-md bg-slate-800 border-black flex flex-col items-center p-4 overflow-hidden"
       data-aos="zoom-in"
     >
       {imageUrl ? (
-        <div className="relative mb-2 sm:mb-4 w-16 h-16 sm:w-28 sm:h-28 overflow-hidden rounded-md">
+        <div className="relative mb-3 w-24 h-24 shrink-0 overflow-hidden rounded-md">
           <Image
             src={imageUrl}
             alt={item.title}
             fill
             unoptimized
-            style={{ objectFit: 'cover' }}
+            className="object-contain"
           />
         </div>
-      ) : null}
+      ) : (
+        <div className="w-24 h-24 shrink-0" />
+      )}
 
-      <h5 className="mb-1 text-xs sm:text-xl font-medium text-white text-center leading-tight">
+      <h5 className="w-full mb-2 text-base sm:text-lg font-medium text-white text-center leading-tight line-clamp-2">
         {item.title}
       </h5>
 
-      <span className="text-[9px] sm:text-sm text-gray-400 text-center w-full line-clamp-2 sm:line-clamp-3 overflow-hidden">
+      <span className="w-full text-xs sm:text-sm text-gray-400 text-center leading-relaxed line-clamp-3 overflow-hidden">
         {item.description}
       </span>
 
-      <div className="mt-auto w-full flex justify-center">
+      <div className="mt-auto w-full flex justify-center pt-3">
         <button
           type="button"
-          className="mt-1 text-white bg-purple-700 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-sm font-semibold cursor-pointer hover:bg-purple-900 text-center disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={() => {
+          className="text-white bg-purple-700 rounded-full px-4 py-2 text-xs sm:text-sm font-semibold cursor-pointer hover:bg-purple-900 text-center disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={(event) => {
+            event.stopPropagation();
+
             if (pdfUrl) {
               DownloadFile(pdfUrl, item.title);
             }

@@ -1,16 +1,17 @@
 type ResumeItem = {
-	_id: string;
-	CV: string;
+	_id?: string;
+	CV?: string;
 };
 
 type GetResumeResponse = {
 	success: boolean;
-	data: ResumeItem[];
+	data: string;
 };
 
 type CreateOrUpdateResumeResponse = {
 	success: boolean;
-	data: ResumeItem;
+	message: string;
+	jobId: string;
 };
 
 type ResumeSignedUrlResponse = {

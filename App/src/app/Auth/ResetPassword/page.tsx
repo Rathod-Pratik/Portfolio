@@ -1,3 +1,5 @@
+"use client";
+
 import { useFormik } from "formik";
 import * as yup from "yup";
 import { useRouter } from "next/navigation";

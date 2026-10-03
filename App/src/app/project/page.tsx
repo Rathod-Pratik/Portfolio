@@ -1,17 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { GET_PROJECT } from '@/utils/constants';
 import Loading from '@/components/Loading';
 import Card from './components/Card';
-import type { ProjectDifficulty, ProjectItem } from '@/types';
+import type { GetProjectsResponse, ProjectDifficulty, ProjectItem } from '@/types';
 import { motion } from 'framer-motion';
-
-type GetProjectsResponse = {
-  data: ProjectItem[];
-};
 
 type DifficultyFilter = 'all' | ProjectDifficulty;
 
@@ -20,30 +16,69 @@ export default function Project() {
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>('all');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const limit = 10;
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
-        const response = await apiClient.get<GetProjectsResponse>(GET_PROJECT);
-        setProjects(response.data.data || []);
+        if (page === 1) {
+          setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
+        const response = await apiClient.get<GetProjectsResponse>(
+          `${GET_PROJECT}?page=${page}&limit=${limit}`
+        );
+        const nextProjects = response.data.data || [];
+        setProjects((currentProjects) =>
+          page === 1 ? nextProjects : [...currentProjects, ...nextProjects],
+        );
+        setHasMore(nextProjects.length === limit);
       } catch (error) {
         console.error('Error fetching projects:', error);
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [page]);
+
+  useEffect(() => {
+    const loadMoreElement = loadMoreRef.current;
+
+    if (!loadMoreElement || loading || loadingMore || !hasMore) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setPage((currentPage) => currentPage + 1);
+        }
+      },
+      { rootMargin: '300px' },
+    );
+
+    observer.observe(loadMoreElement);
+
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, projects.length]);
 
   const difficultyLevels: DifficultyFilter[] = ['all', 'Easy', 'Medium', 'Hard'];
 
   const filteredProjects = useMemo(() => {
     const difficultyOrder: Record<ProjectDifficulty, number> = {
-      Hard: 0,
-      Medium: 1,
-      Easy: 2,
+      Advanced: 0,
+      Hard: 1,
+      Intermediate: 2,
+      Medium: 3,
+      Easy: 4,
     };
 
     const sortedProjects = [...projects].sort((a, b) => {
@@ -87,21 +122,30 @@ export default function Project() {
         {filteredProjects.length === 0 ? (
           <p className="text-center text-gray-600 dark:text-gray-400 py-12">No projects available</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fit,minmax(420px,1fr))] gap-4 lg:gap-6 justify-items-center">
-            {filteredProjects.map((item, index) => (
-              <motion.div
-                key={item._id || index}
-                className="w-full flex justify-center"
-                initial={{ opacity: 0, y: 18 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.2 }}
-                transition={{ duration: 0.35, delay: index * 0.05 }}
-                whileHover={{ y: -4 }}
-              >
-                <Card item={item} routerPush={router.push} />
-              </motion.div>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fit,minmax(420px,1fr))] gap-4 lg:gap-6 justify-items-center">
+              {filteredProjects.map((item, index) => (
+                <motion.div
+                  key={item._id || index}
+                  className="w-full flex justify-center"
+                  initial={{ opacity: 0, y: 18 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.35, delay: index * 0.05 }}
+                  whileHover={{ y: -4 }}
+                >
+                  <Card item={item} routerPush={router.push} />
+                </motion.div>
+              ))}
+            </div>
+            {hasMore && (
+              <div ref={loadMoreRef} className="flex min-h-16 items-center justify-center py-6">
+                {loadingMore && (
+                  <span className="text-sm text-gray-400">Loading more projects...</span>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>

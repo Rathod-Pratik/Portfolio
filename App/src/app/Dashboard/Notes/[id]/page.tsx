@@ -1,11 +1,11 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import type { AxiosError } from "axios";
-import { FiUpload, FiFileText, FiTrash2, FiFile } from "react-icons/fi";
+import { FiUpload, FiFileText, FiTrash2 } from "react-icons/fi";
 import * as yup from "yup";
 import { useFormik } from "formik";
 import { CREATE_NOTES, DELETE_NOTES, EDIT_NOTES, GET_NOTES } from "@api";
@@ -23,13 +23,13 @@ const validationSchema = yup.object().shape({
   title: yup
     .string()
     .trim()
-    .min(3, "Title must be at least 3 characters")
+    .min(1, "Title is required")
     .max(150, "Title must not exceed 150 characters")
     .required("Title is required"),
   description: yup
     .string()
     .trim()
-    .min(10, "Description must be at least 10 characters")
+    .min(1, "Description is required")
     .required("Description is required"),
   image: yup
     .mixed<File>()
@@ -142,7 +142,7 @@ const CreateNote = ({ params }: PageProps) => {
         }
 
         if (values.pdf instanceof File) {
-          payload.append("file", values.pdf);
+          payload.append("pdf", values.pdf);
         }
 
         if (isEdit && id) {
@@ -151,7 +151,7 @@ const CreateNote = ({ params }: PageProps) => {
             withCredentials: true,
           });
 
-          if (response.status === 200 || response.status === 201) {
+          if (response.status === 202) {
             toast.success("Note updated successfully.");
             queryClient.invalidateQueries({ queryKey: ["notes"] });
             queryClient.invalidateQueries({ queryKey: ["admin-note", id] });
@@ -162,7 +162,7 @@ const CreateNote = ({ params }: PageProps) => {
             withCredentials: true,
           });
 
-          if (response.status === 200 || response.status === 201) {
+          if (response.status === 202) {
             toast.success("Note added successfully.");
             queryClient.invalidateQueries({ queryKey: ["notes"] });
             router.push("/Dashboard/Notes");
@@ -171,9 +171,9 @@ const CreateNote = ({ params }: PageProps) => {
       } catch (error) {
         const apiError = error as AxiosError<{ message?: string }>;
 
-        if (apiError.response?.status === 403) {
+        if (apiError.response?.status === 401 || apiError.response?.status === 403) {
           toast.error("Access denied. Please login as admin.");
-          router.push("/login");
+          router.push("/Auth/Login");
           return;
         }
 
@@ -210,9 +210,9 @@ const CreateNote = ({ params }: PageProps) => {
       }
     } catch (error) {
       const apiError = error as AxiosError<{ message?: string }>;
-      if (apiError.response?.status === 403) {
+      if (apiError.response?.status === 401 || apiError.response?.status === 403) {
         toast.error("Access denied. Please login as admin.");
-        router.push("/login");
+        router.push("/Auth/Login");
         return;
       }
       console.error("DeleteNote Error:", apiError);

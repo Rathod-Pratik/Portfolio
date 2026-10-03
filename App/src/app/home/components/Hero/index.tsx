@@ -41,6 +41,9 @@ const Hero = ({ data }: HeroProps) => {
           className="flex flex-col justify-center p-6 text-center rounded-sm lg:max-w-md xl:max-w-lg lg:text-left"
         >
           <span className="text-5xl block">{data.greeting}</span>
+          <span className="mt-2 block text-3xl font-semibold text-white">
+            {data.name}
+          </span>
           <span className="text-purple-500 text-5xl mt-2 block min-h-15 whitespace-normal sm:whitespace-nowrap">
             <Typewriter
               options={{
@@ -62,17 +65,21 @@ const Hero = ({ data }: HeroProps) => {
           variants={rightItemVariants}
           className="flex items-center justify-center p-6 mt-8 lg:mt-0"
         >
-          <div className="relative h-64 w-64 overflow-hidden rounded-full sm:h-72 sm:w-72 lg:h-80 lg:w-80 xl:h-96 xl:w-96">
-            <Image
-              src={data.image}
-              alt="Hero Avatar"
-              fill
-              unoptimized
-              loading="eager"
-              sizes="(max-width: 640px) 256px, (max-width: 1024px) 288px, 384px"
-              className="object-cover"
-            />
-          </div>
+          {data.image ? (
+            <div className="relative h-64 w-64 overflow-hidden rounded-full sm:h-72 sm:w-72 lg:h-80 lg:w-80 xl:h-96 xl:w-96">
+              <Image
+                src={data.image}
+                alt="Hero Avatar"
+                fill
+                unoptimized
+                loading="eager"
+                sizes="(max-width: 640px) 256px, (max-width: 1024px) 288px, 384px"
+                className="object-cover"
+              />
+            </div>
+          ) : (
+            <div className="h-64 w-64 rounded-full bg-slate-800 sm:h-72 sm:w-72 lg:h-80 lg:w-80 xl:h-96 xl:w-96" />
+          )}
         </motion.div>
       </motion.div>
     </section>

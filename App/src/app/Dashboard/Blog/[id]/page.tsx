@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -33,6 +33,7 @@ export type BlogType = {
 	content?: string;
 	isPublished?: boolean;
 	coverImage?: string;
+	image?: string;
 	createdAt?: string;
 	updatedAt?: string;
 };
@@ -47,7 +48,7 @@ const validationSchema = yup.object().shape({
 	title: yup
 		.string()
 		.trim()
-		.min(3, "Title must be at least 3 characters")
+		.min(1, "Title is required")
 		.max(150, "Title must not exceed 150 characters")
 		.required("Title is required"),
 	slug: yup
@@ -62,13 +63,13 @@ const validationSchema = yup.object().shape({
 	excerpt: yup
 		.string()
 		.trim()
-		.min(10, "Excerpt must be at least 10 characters")
+		.min(1, "Excerpt is required")
 		.max(300, "Excerpt must not exceed 300 characters")
 		.required("Excerpt is required"),
 	content: yup
 		.string()
 		.trim()
-		.min(20, "Content must be at least 20 characters")
+		.min(1, "Content is required")
 		.required("Content is required"),
 	tags: yup
 		.array()
@@ -114,7 +115,6 @@ const CreateBlog = ({ params }: PageProps) => {
 	const isEdit = Boolean(rawId && rawId !== "create" && rawId !== "new");
 	const id = isEdit ? rawId : null;
 
-	const [tagInput, setTagInput] = useState("");
 	const [isDeleting, setIsDeleting] = useState(false);
 
 	const {
@@ -128,19 +128,13 @@ const CreateBlog = ({ params }: PageProps) => {
 			const response = await apiClient.get(`${GET_BLOG_DETAILS}/${id}`, {
 				withCredentials: true,
 			});
-			const blogData = response.data?.blog ?? response.data;
+			const blogData = response.data?.data ?? response.data?.blog ?? response.data;
 			if (!blogData) {
 				throw new Error("Blog not found");
 			}
 			return blogData;
 		},
 	});
-
-	useEffect(() => {
-		if (blog?.tags && Array.isArray(blog.tags)) {
-			setTagInput(blog.tags.join(", "));
-		}
-	}, [blog?.tags]);
 
 	const generateSlug = (text: string) => {
 		return text
@@ -195,7 +189,7 @@ const CreateBlog = ({ params }: PageProps) => {
 						}
 					);
 
-					if (response.status === 200) {
+					if (response.status === 200 || response.status === 202) {
 						toast.success("Blog updated successfully");
 						queryClient.invalidateQueries({ queryKey: ["blogs"] });
 						queryClient.invalidateQueries({ queryKey: ["admin-blog", id] });
@@ -217,16 +211,23 @@ const CreateBlog = ({ params }: PageProps) => {
 					}
 				}
 			} catch (error) {
-				const apiError = error as AxiosError<{ message?: string }>;
+				const apiError = error as AxiosError<{
+					message?: string;
+					error?: string | Array<{ message?: string }>;
+				}>;
 
 				if (apiError.response?.status === 403) {
 					toast.error("Access denied. Please login as admin.");
-					router.push("/login");
+					router.push("/Auth/Login");
 					return;
 				}
 
+				const validationError = Array.isArray(apiError.response?.data?.error)
+					? apiError.response.data.error[0]?.message
+					: apiError.response?.data?.error;
 				const errorMessage =
 					apiError.response?.data?.message ||
+					validationError ||
 					(isEdit ? "Failed to update blog" : "Failed to create blog");
 
 				toast.error(errorMessage);
@@ -260,14 +261,24 @@ const CreateBlog = ({ params }: PageProps) => {
 				router.push("/Dashboard/Blog");
 			}
 		} catch (error) {
-			const apiError = error as AxiosError<{ message?: string }>;
+			const apiError = error as AxiosError<{
+				message?: string;
+				error?: string | Array<{ message?: string }>;
+			}>;
 			if (apiError.response?.status === 403) {
 				toast.error("Access denied. Please login as admin.");
-				router.push("/login");
+				router.push("/Auth/Login");
 				return;
 			}
 
-			toast.error(apiError.response?.data?.message || "Failed to delete blog");
+			const validationError = Array.isArray(apiError.response?.data?.error)
+				? apiError.response.data.error[0]?.message
+				: apiError.response?.data?.error;
+			toast.error(
+				apiError.response?.data?.message ||
+				validationError ||
+				"Failed to delete blog"
+			);
 			console.error(apiError);
 		} finally {
 			setIsDeleting(false);
@@ -365,7 +376,7 @@ const CreateBlog = ({ params }: PageProps) => {
 					name="image"
 					lable="Cover Image"
 					inputType="Image"
-					imagePreview={formik.values.coverImage}
+					imagePreview={formik.values.coverImage || blog?.image || ""}
 					handleImageChange={(file) => {
 						formik.setFieldValue("image", file ?? undefined);
 						formik.setFieldTouched("image", true);
@@ -388,7 +399,12 @@ const CreateBlog = ({ params }: PageProps) => {
 						lable="Title"
 						value={formik.values.title}
 						inputType="input"
-						onChange={(value) => formik.setFieldValue("title", value)}
+						onChange={(value) => {
+							formik.setFieldValue("title", value);
+							if (!isEdit) {
+								formik.setFieldValue("slug", generateSlug(value));
+							}
+						}}
 						onBlur={() => formik.setFieldTouched("title", true)}
 						placeholder="e.g. Master Modern Full-Stack Web Development in 2026"
 						error={
@@ -480,10 +496,9 @@ const CreateBlog = ({ params }: PageProps) => {
 						type="text"
 						name="tags"
 						lable="Tags (comma separated)"
-						value={tagInput}
+						value={formik.values.tags.join(", ")}
 						inputType="input"
 						onChange={(value) => {
-							setTagInput(value);
 							const parsed = value
 								.split(",")
 								.map((tag) => tag.trim())
@@ -492,11 +507,10 @@ const CreateBlog = ({ params }: PageProps) => {
 						}}
 						onBlur={() => {
 							formik.setFieldTouched("tags", true);
-							const parsed = tagInput
+							const parsed = formik.values.tags.join(", ")
 								.split(",")
 								.map((tag) => tag.trim())
 								.filter(Boolean);
-							setTagInput(parsed.join(", "));
 							formik.setFieldValue("tags", parsed);
 						}}
 						placeholder="e.g. Next.js, React, TypeScript, FullStack"
@@ -517,7 +531,6 @@ const CreateBlog = ({ params }: PageProps) => {
 										onClick={() => {
 											const remaining = formik.values.tags.filter((t) => t !== tag);
 											formik.setFieldValue("tags", remaining);
-											setTagInput(remaining.join(", "));
 										}}
 										className="hover:text-red-400 font-bold text-sm leading-none ml-0.5"
 										title={`Remove ${tag}`}

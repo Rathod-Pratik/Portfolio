@@ -1,7 +1,9 @@
+"use client";
+
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@apiClient";
-import { DELETE_CONTACT, GET_CONTACT } from "@api";
+import { DELETE_CONTACT, GET_CONTACT, UPDATE_CONTACT_STATUS } from "@api";
 import { toast } from "react-toastify";
 import { FaTrash } from "react-icons/fa";
 import { useRouter } from "next/navigation";
@@ -41,6 +43,8 @@ const ContactUs = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
   const debouncedSearch = useDebounce(searchTerm, 500);
 
@@ -50,9 +54,9 @@ const ContactUs = () => {
     isError,
     error,
   } = useQuery<ContactUsItem[]>({
-    queryKey: ["contacts"],
+    queryKey: ["contacts", page],
     queryFn: async () => {
-      const response = await apiClient.get(GET_CONTACT, {
+      const response = await apiClient.get(`${GET_CONTACT}?page=${page}&limit=${limit}`, {
         withCredentials: true,
       });
 
@@ -63,6 +67,29 @@ const ContactUs = () => {
       return response.data.data ?? [];
     },
   });
+
+  const updateStatus = async (
+    contact: ContactUsItem,
+    status: ContactUsItem["status"]
+  ) => {
+    try {
+      await apiClient.put(
+        `${UPDATE_CONTACT_STATUS}/${contact._id}`,
+        { _id: contact._id, status },
+        { withCredentials: true }
+      );
+      toast.success("Contact status updated.");
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+    } catch (error) {
+      const apiError = error as AxiosError<{ message?: string }>;
+      if (apiError.response?.status === 401 || apiError.response?.status === 403) {
+        toast.error("Your admin session is invalid. Please login again.");
+        router.push("/Auth/Login");
+        return;
+      }
+      toast.error(apiError.response?.data?.message || "Failed to update contact status.");
+    }
+  };
 
   const filteredContacts = useMemo(() => {
     const value = debouncedSearch.trim().toLowerCase();
@@ -91,9 +118,9 @@ const ContactUs = () => {
 
     const apiError = error as AxiosError;
 
-    if (apiError.response?.status === 403) {
+    if (apiError.response?.status === 401 || apiError.response?.status === 403) {
       toast.error("Access denied. Please login as admin.");
-      router.push("/login");
+      router.push("/Auth/Login");
       return;
     }
 
@@ -102,6 +129,10 @@ const ContactUs = () => {
 
   const deleteContact = async (_id: string) => {
     if (deletingId) {
+      return;
+    }
+
+    if (!window.confirm("Delete this contact message?")) {
       return;
     }
 
@@ -122,9 +153,9 @@ const ContactUs = () => {
     } catch (error) {
       const apiError = error as AxiosError;
 
-      if (apiError.response?.status === 403) {
+      if (apiError.response?.status === 401 || apiError.response?.status === 403) {
         toast.error("Access denied. Please login as admin.");
-        router.push("/login");
+        router.push("/Auth/Login");
         return;
       }
 
@@ -161,7 +192,7 @@ const ContactUs = () => {
                 <th className="px-4 py-2 text-center">Mobile</th>
                 <th className="px-4 py-2 text-center">Project</th>
                 <th className="px-4 py-2 text-center">Budget</th>
-                <th className="px-4 py-2 text-center">Status</th>
+                        <th className="px-4 py-2 text-center">Status</th>
                 <th className="px-4 py-2 text-center">Message</th>
                 <th className="px-4 py-2 text-center">Action</th>
               </tr>
@@ -199,7 +230,14 @@ const ContactUs = () => {
                     </td>
 
                     <td className="px-4 py-2 text-center">
-                      <span
+                      <select
+                        value={contact.status}
+                        onChange={(event) =>
+                          updateStatus(
+                            contact,
+                            event.target.value as ContactUsItem["status"]
+                          )
+                        }
                         className={`rounded-md px-3 py-1 text-sm ${contact.status === "new"
                           ? "bg-blue-500/20 text-blue-400"
                           : contact.status === "contacted"
@@ -209,11 +247,11 @@ const ContactUs = () => {
                               : "bg-green-500/20 text-green-400"
                           }`}
                       >
-                        {contact.status === "inProgress"
-                          ? "In Progress"
-                          : contact.status.charAt(0).toUpperCase() +
-                          contact.status.slice(1)}
-                      </span>
+                        <option value="new">New</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="inProgress">In Progress</option>
+                        <option value="closed">Closed</option>
+                      </select>
                     </td>
 
                     <td className="max-w-xs px-4 py-2 text-center">
@@ -251,6 +289,25 @@ const ContactUs = () => {
               )}
             </tbody>
           </table>
+          <div className="flex items-center justify-center gap-4 py-5 text-white">
+            <button
+              type="button"
+              disabled={page === 1}
+              onClick={() => setPage((current) => current - 1)}
+              className="rounded bg-gray-700 px-4 py-2 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span>Page {page}</span>
+            <button
+              type="button"
+              disabled={contacts.length < limit}
+              onClick={() => setPage((current) => current + 1)}
+              className="rounded bg-gray-700 px-4 py-2 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

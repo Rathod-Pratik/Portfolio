@@ -2,6 +2,7 @@ type BlogDetail = {
 	_id: string;
 	title: string;
 	coverImage?: string;
+	image?: string;
 	author?: string;
 	createdAt?: string;
 	excerpt?: string;

@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import React from "react";
 import { FiImage } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { useFormik } from "formik";
@@ -7,15 +9,31 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@apiClient";
 import { GET_HERO, UPDATE_HERO } from "@api";
 import { Input, Loading } from "@components";
+import type { AxiosError } from "axios";
+
+type HeroResponse = {
+  data: {
+    greeting: string;
+    name: string;
+    roles: string[];
+    description: string;
+    image: string;
+  };
+  source: "cache" | "database";
+};
+
+type ApiError = {
+  message?: string;
+};
 
 const Hero = () => {
   const queryClient = useQueryClient();
 
-  const { data, isLoading: fetching } = useQuery({
+  const { data, isLoading: fetching } = useQuery<HeroResponse["data"]>({
     queryKey: ["hero"],
     queryFn: async () => {
-      const response = await apiClient.get(GET_HERO);
-      return response.data;
+      const response = await apiClient.get<HeroResponse>(GET_HERO);
+      return response.data.data;
     },
   });
 
@@ -30,10 +48,10 @@ const Hero = () => {
       imageFile: undefined as File | undefined,
     },
     validationSchema: Yup.object({
-      greeting: Yup.string().required("Greeting is required"),
-      name: Yup.string().required("Name is required"),
-      roles: Yup.string().required("At least one role is required"),
-      description: Yup.string().required("Description is required"),
+      greeting: Yup.string().min(1, "Greeting is required").required("Greeting is required"),
+      name: Yup.string().min(1, "Name is required").required("Name is required"),
+      roles: Yup.string().min(1, "At least one role is required").required("At least one role is required"),
+      description: Yup.string().min(1, "Description is required").required("Description is required"),
     }),
     onSubmit: async (values, { setSubmitting }) => {
       try {
@@ -60,13 +78,21 @@ const Hero = () => {
         });
 
 
-        if (response.status === 200) {
+        if (response.status === 202) {
           queryClient.invalidateQueries({ queryKey: ["hero"] });
           toast.success("Hero section updated successfully!");
           formik.setFieldValue("imageFile", undefined);
         }
       } catch (error) {
-        toast.error("Failed to update Hero section");
+        const apiError = error as AxiosError<ApiError>;
+        if (apiError.response?.status === 401 || apiError.response?.status === 403) {
+          toast.error("Access denied. Please login as admin.");
+        } else {
+          toast.error(
+            apiError.response?.data?.message ||
+            "Failed to update Hero section"
+          );
+        }
       } finally {
         setSubmitting(false);
       }

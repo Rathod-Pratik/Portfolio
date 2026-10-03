@@ -5,8 +5,8 @@ import { useParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { apiClient } from '@/lib/api-client';
-import { GET_PROJECT_DATA } from '@/utils/constants';
-import type { ProjectDetail } from '@/types';
+import { GET_PROJECT } from '@/utils/constants';
+import type { GetProjectResponse, ProjectDetail } from '@/types';
 import { Loading } from '@/components';
 import { motion } from 'framer-motion';
 
@@ -24,7 +24,7 @@ export default function ProjectDetailsPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await apiClient.get<ProjectDetail>(`${GET_PROJECT_DATA}/${id}`);
+        const response = await apiClient.get<GetProjectResponse>(`${GET_PROJECT}/${id}`);
         setProject(response.data.data);
       } catch (error) {
         console.error('Error fetching project details:', error);
@@ -52,7 +52,7 @@ export default function ProjectDetailsPage() {
         transition={{ duration: 0.4 }}
         className="max-w-4xl mx-auto px-4 py-12"
       >
-        {project.images && (
+        {(project.image || project.images) && (
           <div className="mb-8">
             <button
               type="button"
@@ -64,7 +64,7 @@ export default function ProjectDetailsPage() {
             </button>
             <div className="relative w-full overflow-hidden rounded-lg" style={{ aspectRatio: '16/8' }}>
               <Image
-                src={project.images}
+                src={project.image || project.images}
                 alt={project.title}
                 fill
                 unoptimized

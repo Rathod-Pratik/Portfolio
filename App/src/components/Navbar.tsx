@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { IoMdMenu, IoMdClose } from 'react-icons/io';
+import { IoMdClose,IoMdMenu } from 'react-icons/io';
 
 export default function Navbar() {
 
@@ -95,9 +95,7 @@ export default function Navbar() {
             ))}
 
           </ul>
-
-          {/* Right Side */}
-          <div className="flex items-center gap-3">
+  <div className="flex items-center gap-3">
 
             <a
               href="mailto:rathodpratik1928@gmail.com"
@@ -159,8 +157,7 @@ export default function Navbar() {
 
             ))}
 
-          </ul>
-
+          </ul>          
           <div className="px-8 mt-10">
 
             <a

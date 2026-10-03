@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import { FiImage } from "react-icons/fi";
@@ -13,6 +15,7 @@ import {
   UPDATE_EXPERTISE,
 } from "@api";
 import { Input, Loading } from "@components";
+import type { AxiosError } from "axios";
 
 type ExpertiseType = {
   _id?: string;
@@ -20,7 +23,16 @@ type ExpertiseType = {
   description: string;
   image: string;
   imageFile?: File | null;
-}
+};
+
+type ExpertiseResponse = {
+  data: ExpertiseType[];
+  source: "cache" | "database";
+};
+
+type ApiError = {
+  message?: string;
+};
 
 const Expertise = () => {
   const queryClient = useQueryClient();
@@ -31,8 +43,10 @@ const Expertise = () => {
   const { data: expertiseList = [], isLoading } = useQuery<ExpertiseType[]>({
     queryKey: ["expertise"],
     queryFn: async () => {
-      const response = await apiClient.get(GET_EXPERTISE);
-      return response.data;
+      const response = await apiClient.get<ExpertiseResponse>(
+        `${GET_EXPERTISE}/?page=1&limit=100`
+      );
+      return response.data.data;
     },
   });
 
@@ -46,13 +60,22 @@ const Expertise = () => {
       imageFile: undefined,
     },
     validationSchema: Yup.object({
-      title: Yup.string().required("Title is required"),
-      description: Yup.string().required("Description is required"),
+      title: Yup.string().min(1, "Title is required").required("Title is required"),
+      description: Yup.string()
+        .min(1, "Description is required")
+        .required("Description is required"),
       imageFile: Yup.mixed().when("_id", {
         is: (id: string) => !id,
         then: (schema) => schema.required("Image is required"),
         otherwise: (schema) => schema.notRequired(),
-      }),
+      }).test(
+        "imageType",
+        "Only JPG, JPEG, PNG, and WEBP images are allowed",
+        (value) =>
+          !value ||
+          !(value instanceof File) ||
+          ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(value.type)
+      ),
     }),
     onSubmit: async (values, { setSubmitting }) => {
       try {
@@ -72,18 +95,26 @@ const Expertise = () => {
             { withCredentials: true }
           );
         } else {
-          response = await apiClient.post(CREATE_EXPERTISE, formData, {
+          response = await apiClient.post(`${CREATE_EXPERTISE}/`, formData, {
             withCredentials: true,
           });
         }
 
-        if (response.status === 200 || response.status === 201) {
+        if (response.status === 202) {
           toast.success(`Expertise ${values._id ? "updated" : "added"} successfully`);
           queryClient.invalidateQueries({ queryKey: ["expertise"] });
           closeModel();
         }
       } catch (error) {
-        toast.error(`Failed to ${values._id ? "update" : "add"} Expertise`);
+        const apiError = error as AxiosError<ApiError>;
+        if (apiError.response?.status === 401 || apiError.response?.status === 403) {
+          toast.error("Access denied. Please login as admin.");
+          return;
+        }
+        toast.error(
+          apiError.response?.data?.message ||
+          `Failed to ${values._id ? "update" : "add"} Expertise`
+        );
       } finally {
         setSubmitting(false);
       }
@@ -127,6 +158,10 @@ const Expertise = () => {
   };
 
   const deleteExpertise = async (id: string) => {
+    if (!window.confirm("Delete this expertise?")) {
+      return;
+    }
+
     try {
       const response = await apiClient.delete(`${DELETE_EXPERTISE}/${id}`, {
         withCredentials: true,
@@ -137,8 +172,12 @@ const Expertise = () => {
         queryClient.invalidateQueries({ queryKey: ["expertise"] });
       }
     } catch (error) {
-      toast.error("Failed to delete Expertise");
-    } finally {
+      const apiError = error as AxiosError<ApiError>;
+      if (apiError.response?.status === 401 || apiError.response?.status === 403) {
+        toast.error("Access denied. Please login as admin.");
+      } else {
+        toast.error(apiError.response?.data?.message || "Failed to delete Expertise");
+      }
     }
   };
 

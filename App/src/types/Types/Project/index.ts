@@ -1,4 +1,4 @@
-type ProjectDifficulty = "Easy" | "Medium" | "Hard";
+type ProjectDifficulty = "Easy" | "Medium" | "Hard" | "Intermediate" | "Advanced";
 type ProjectDifficultyOption = "" | ProjectDifficulty;
 
 type ProjectItem = {
@@ -7,6 +7,7 @@ type ProjectItem = {
 	subtitle?: string;
 	description: string;
 	images: string;
+	image?: string;
 	difficult?: ProjectDifficulty;
 	liveDemoLink?: string;
 	techStack?: string[];
@@ -43,6 +44,16 @@ type ProjectCardProps = {
 	item: ProjectItem;
 };
 
+type GetProjectsResponse = {
+	success: boolean;
+	data: ProjectItem[];
+};
+
+type GetProjectResponse = {
+	success: boolean;
+	data: ProjectItem;
+};
+
 export type {
 	ProjectDifficulty,
 	ProjectDifficultyOption,
@@ -50,4 +61,6 @@ export type {
 	ProjectFormData,
 	CreateOrUpdateProjectPayload,
 	ProjectCardProps,
+	GetProjectsResponse,
+	GetProjectResponse,
 };

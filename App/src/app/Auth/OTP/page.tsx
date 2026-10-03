@@ -1,190 +1,50 @@
-import { useRouter } from "next/navigation";
-import { useFormik } from "formik";
-import * as yup from "yup";
-import { toast } from "react-toastify";
-import { FaEye, FaEyeSlash } from "react-icons/fa";
+"use client";
+
 import { useState } from "react";
-import { Input, Button, Loading } from "@components";
-import { LOGIN } from "@api";
-import apiClient from "@apiClient";
+import { useRouter } from "next/navigation";
+import { toast } from "react-toastify";
 import type { AxiosError } from "axios";
+import { LOGIN_VERIFY_OTP } from "@api";
+import apiClient from "@apiClient";
+import { Button, Input } from "@components";
 
-type LoginFormValues = {
-    email: string;
-    password: string;
-};
+type ApiError = { error?: string; message?: string };
 
-const validationSchema = yup.object({
-    email: yup
-        .string()
-        .trim()
-        .email("Please enter a valid email address.")
-        .required("Email is required."),
-
-    password: yup
-        .string()
-        .required("Password is required.")
-        .min(6, "Password must be at least 6 characters."),
-});
-
-const Login = () => {
+export default function LoginOtp() {
     const router = useRouter();
-    const [showPassword, setShowPassword] = useState(false);
+    const [otp, setOtp] = useState("");
+    const [submitting, setSubmitting] = useState(false);
 
-    const formik = useFormik<LoginFormValues>({
-        initialValues: {
-            email: "",
-            password: "",
-        },
-        validationSchema,
-        onSubmit: async (values, { setSubmitting }) => {
-            try {
-                const response = await apiClient.post(
-                    LOGIN,
-                    {
-                        email: values.email.toLowerCase().trim(),
-                        password: values.password,
-                    },
-                    {
-                        withCredentials: true,
-                    }
-                );
+    const verify = async (event: React.FormEvent) => {
+        event.preventDefault();
+        const email = sessionStorage.getItem("loginEmail") || "";
+        if (!email || !/^\d{6}$/.test(otp)) {
+            toast.error("Enter a valid 6-digit OTP.");
+            return;
+        }
 
-                if (response.status === 200) {
-                    toast.success("Login successful");
-                    router.push("/Dashboard");
-                }
-            } catch (error) {
-                const apiError = error as AxiosError<{ error?: string }>;
-
-                toast.error(
-                    apiError.response?.data?.error ||
-                    "Invalid email or password."
-                );
-            } finally {
-                setSubmitting(false);
-            }
-        },
-    });
+        setSubmitting(true);
+        try {
+            const response = await apiClient.post(LOGIN_VERIFY_OTP, { email, otp });
+            sessionStorage.setItem("user", JSON.stringify(response.data.userInfo));
+            sessionStorage.removeItem("loginEmail");
+            toast.success("Login successful.");
+            router.push("/Dashboard");
+        } catch (error) {
+            const apiError = error as AxiosError<ApiError>;
+            toast.error(apiError.response?.data?.error || apiError.response?.data?.message || "Failed to verify OTP.");
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-2 sm:px-6 lg:px-8">
-            <div className="relative shadow-xl rounded-2xl overflow-hidden w-full max-w-4xl flex flex-col lg:flex-row bg-[#111827] border border-gray-800">
-                {formik.isSubmitting && <Loading />}
-
-                <div className="lg:w-1/2 hidden md:flex items-center justify-center p-6 sm:p-12">
-                    <div className="text-center text-white">
-                        <img
-                            src="/Login_image.png"
-                            alt="Welcome illustration"
-                            className="max-w-full h-auto mx-auto mb-8 rounded-lg shadow-lg"
-                        />
-
-                        <h3 className="text-2xl font-bold mb-2">
-                            Welcome Back!
-                        </h3>
-
-                        <p className="opacity-90">
-                            Sign in to access your account
-                        </p>
-                    </div>
-                </div>
-
-                <div className="lg:w-1/2 p-6 sm:p-8 lg:p-12 flex flex-col justify-center">
-                    <div className="text-center mb-8">
-                        <h2 className="text-3xl font-extrabold text-white">
-                            Login now
-                        </h2>
-                    </div>
-
-                    <form
-                        onSubmit={formik.handleSubmit}
-                        className="space-y-6"
-                    >
-                        <Input
-                            type="email"
-                            name="email"
-                            lable="Email address"
-                            placeholder="Enter your email"
-                            value={formik.values.email}
-                            inputType="input"
-                            onChange={(value) =>
-                                formik.setFieldValue(
-                                    "email",
-                                    value.toLowerCase()
-                                )
-                            }
-                            onBlur={() =>
-                                formik.setFieldTouched("email", true)
-                            }
-                            error={
-                                formik.touched.email
-                                    ? formik.errors.email
-                                    : undefined
-                            }
-                        />
-
-                        <div className="relative">
-                            <Input
-                                type={showPassword ? "text" : "password"}
-                                name="password"
-                                lable="Password"
-                                placeholder="Enter your password"
-                                value={formik.values.password}
-                                inputType="input"
-                                onChange={(value) =>
-                                    formik.setFieldValue("password", value)
-                                }
-                                onBlur={() =>
-                                    formik.setFieldTouched("password", true)
-                                }
-                                error={
-                                    formik.touched.password
-                                        ? formik.errors.password
-                                        : undefined
-                                }
-                            />
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setShowPassword((value) => !value)
-                                }
-                                className="absolute right-3 top-[38px] text-gray-400 hover:text-gray-200"
-                            >
-                                {showPassword ? (
-                                    <FaEyeSlash size={18} />
-                                ) : (
-                                    <FaEye size={18} />
-                                )}
-                            </button>
-                        </div>
-
-                        <div className="flex justify-end">
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    router.push("/forgot-password")
-                                }
-                                className="text-sm text-blue-400 hover:text-blue-300"
-                            >
-                                Forgot password?
-                            </button>
-                        </div>
-
-                        <Button
-                            type="submit"
-                            text="Sign in"
-                            ProcessText="Signing in..."
-                            varient="primary"
-                            isSubmitting={formik.isSubmitting}
-                            className="w-full"
-                        />
-                    </form>
-                </div>
-            </div>
+        <div className="min-h-screen flex items-center justify-center px-4">
+            <form onSubmit={verify} className="w-full max-w-md space-y-6 rounded-2xl border border-gray-800 bg-[#111827] p-8">
+                <h2 className="text-center text-3xl font-extrabold text-white">Verify Login OTP</h2>
+                <Input type="text" name="otp" lable="6-digit OTP" value={otp} onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 6))} />
+                <Button type="submit" text="Verify OTP" ProcessText="Verifying..." isSubmitting={submitting} className="w-full" />
+            </form>
         </div>
     );
-};
-
-export default Login;
+}

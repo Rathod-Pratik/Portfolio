@@ -25,4 +25,22 @@ type NoteCardProps = {
 	item: NoteItem;
 };
 
-export type { NoteItem, NoteFormData, NoteCardProps };
+type GetNotesResponse = {
+	success: boolean;
+	data: {
+		notes: NoteItem[];
+		total: number;
+		page: number;
+		limit: number;
+		totalPages: number;
+	};
+	source: "cache" | "database";
+};
+
+type GetNoteResponse = {
+	success: boolean;
+	data: NoteItem;
+	source: "cache" | "database";
+};
+
+export type { NoteItem, NoteFormData, NoteCardProps, GetNotesResponse, GetNoteResponse };

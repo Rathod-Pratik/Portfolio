@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { GET_BLOG } from '@/utils/constants';
 import type { AdminBlogItem } from '@/types';
@@ -10,27 +10,65 @@ import { motion } from 'framer-motion';
 
 type GetBlogsResponse = {
   blog: AdminBlogItem[];
+  source: 'cache' | 'database';
 };
 
 export default function Blog() {
   const [blogs, setBlogs] = useState<AdminBlogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const limit = 10;
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
-        const response = await apiClient.get<GetBlogsResponse>(GET_BLOG);
-        setBlogs(response.data.blog || []);
+        if (page === 1) {
+          setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
+        const response = await apiClient.get<GetBlogsResponse>(
+          `${GET_BLOG}?page=${page}&limit=${limit}`
+        );
+        const nextBlogs = response.data.blog || [];
+        setBlogs((currentBlogs) =>
+          page === 1 ? nextBlogs : [...currentBlogs, ...nextBlogs],
+        );
+        setHasMore(nextBlogs.length === limit);
       } catch (error) {
         console.error('Error fetching blogs:', error);
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [page]);
+
+  useEffect(() => {
+    const loadMoreElement = loadMoreRef.current;
+
+    if (!loadMoreElement || loading || loadingMore || !hasMore) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setPage((currentPage) => currentPage + 1);
+        }
+      },
+      { rootMargin: '300px' },
+    );
+
+    observer.observe(loadMoreElement);
+
+    return () => observer.disconnect();
+  }, [blogs.length, hasMore, loading, loadingMore]);
 
   if (loading) {
     return <Loading />;
@@ -59,6 +97,13 @@ export default function Blog() {
                 <Card item={blog} />
               </motion.div>
             ))}
+          </div>
+        )}
+        {hasMore && (
+          <div ref={loadMoreRef} className="flex min-h-16 items-center justify-center py-6">
+            {loadingMore && (
+              <span className="text-sm text-gray-400">Loading more blogs...</span>
+            )}
           </div>
         )}
       </div>

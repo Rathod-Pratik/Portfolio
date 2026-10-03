@@ -11,7 +11,7 @@ import {
 	SkillsProps,
 } from "./Types/Home";
 
-import { NoteItem, NoteFormData, NoteCardProps } from "./Types/Note";
+import { NoteItem, NoteFormData, NoteCardProps, GetNotesResponse, GetNoteResponse } from "./Types/Note";
 import {
 	ProjectDifficulty,
 	ProjectDifficultyOption,
@@ -19,6 +19,8 @@ import {
 	ProjectFormData,
 	CreateOrUpdateProjectPayload,
 	ProjectCardProps,
+	GetProjectsResponse,
+	GetProjectResponse,
 } from "./Types/Project";
 
 import { BlogDetail, BlogListItem } from "./Types/BlogDetail";
@@ -60,6 +62,8 @@ export type {
 	NoteItem,
 	NoteFormData,
 	NoteCardProps,
+	GetNotesResponse,
+	GetNoteResponse,
 	ProjectDifficulty,
 	ProjectDifficultyOption,
 	IBlog,
@@ -72,6 +76,8 @@ export type {
 	ProjectFormData,
 	CreateOrUpdateProjectPayload,
 	ProjectCardProps,
+	GetProjectsResponse,
+	GetProjectResponse,
 	AdminSkillItem,
 	SkillFormData,
 	CreateOrUpdateSkillPayload,

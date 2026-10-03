@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -12,6 +14,7 @@ import {
   UPDATE_EXPERIENCE,
 } from "@api";
 import { Input, Loading } from "@components";
+import type { AxiosError } from "axios";
 
 type ExperienceType = {
   _id?: string;
@@ -20,6 +23,15 @@ type ExperienceType = {
   duration: string;
   company: string;
   description: string;
+};
+
+type ExperienceResponse = {
+  data: ExperienceType[];
+  source: "cache" | "database";
+};
+
+type ApiError = {
+  message?: string;
 };
 
 const Experience = () => {
@@ -31,8 +43,10 @@ const Experience = () => {
   const { data: experiences = [], isLoading } = useQuery<ExperienceType[]>({
     queryKey: ["experience"],
     queryFn: async () => {
-      const response = await apiClient.get(GET_EXPERIENCE);
-      return response.data;
+      const response = await apiClient.get<ExperienceResponse>(
+        `${GET_EXPERIENCE}/?page=1&limit=100`
+      );
+      return response.data.data;
     },
   });
 
@@ -47,42 +61,51 @@ const Experience = () => {
       description: editingItem?.description || "",
     },
     validationSchema: Yup.object({
-      year: Yup.string().required("Year is required"),
-      duration: Yup.string().required("Duration is required"),
-      title: Yup.string().required("Title is required"),
-      company: Yup.string().required("Company is required"),
-      description: Yup.string().required("Description is required"),
+      year: Yup.string().min(1, "Year is required").required("Year is required"),
+      duration: Yup.string().min(1, "Duration is required").required("Duration is required"),
+      title: Yup.string().min(1, "Title is required").required("Title is required"),
+      company: Yup.string().min(1, "Company is required").required("Company is required"),
+      description: Yup.string().min(1, "Description is required").required("Description is required"),
     }),
     onSubmit: async (values, { setSubmitting }) => {
       try {
 
-        const formData = new FormData();
-        formData.append("year", values.year);
-        formData.append("duration", values.duration);
-        formData.append("title", values.title);
-        formData.append("company", values.company);
-        formData.append("description", values.description);
+        const payload = {
+          year: values.year.trim(),
+          duration: values.duration.trim(),
+          title: values.title.trim(),
+          company: values.company.trim(),
+          description: values.description.trim(),
+        };
 
         let response;
         if (values._id) {
           response = await apiClient.put(
             `${UPDATE_EXPERIENCE}/${values._id}`,
-            formData,
+            payload,
             { withCredentials: true }
           );
         } else {
-          response = await apiClient.post(CREATE_EXPERIENCE, formData, {
+          response = await apiClient.post(`${CREATE_EXPERIENCE}/`, payload, {
             withCredentials: true,
           });
         }
 
-        if (response.status === 200 || response.status === 201) {
+        if (response.status === 202) {
           toast.success(`Experience ${values._id ? "updated" : "added"} successfully`);
           queryClient.invalidateQueries({ queryKey: ["experience"] });
           closeModel();
         }
       } catch (error) {
-        toast.error(`Failed to ${values._id ? "update" : "add"} Experience`);
+        const apiError = error as AxiosError<ApiError>;
+        if (apiError.response?.status === 401 || apiError.response?.status === 403) {
+          toast.error("Access denied. Please login as admin.");
+          return;
+        }
+        toast.error(
+          apiError.response?.data?.message ||
+          `Failed to ${values._id ? "update" : "add"} Experience`
+        );
       } finally {
         setSubmitting(false);
       }
@@ -121,6 +144,10 @@ const Experience = () => {
   };
 
   const deleteExperience = async (id: string) => {
+    if (!window.confirm("Delete this experience?")) {
+      return;
+    }
+
     try {
       const response = await apiClient.delete(`${DELETE_EXPERIENCE}/${id}`, {
         withCredentials: true,
@@ -131,7 +158,12 @@ const Experience = () => {
         queryClient.invalidateQueries({ queryKey: ["experience"] });
       }
     } catch (error) {
-      toast.error("Failed to delete experience");
+      const apiError = error as AxiosError<ApiError>;
+      if (apiError.response?.status === 401 || apiError.response?.status === 403) {
+        toast.error("Access denied. Please login as admin.");
+      } else {
+        toast.error(apiError.response?.data?.message || "Failed to delete experience");
+      }
     }
   };
 

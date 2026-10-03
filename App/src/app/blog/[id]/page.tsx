@@ -26,8 +26,10 @@ export default function BlogDetailsPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await apiClient.get<BlogDetail>(`${GET_BLOG_DETAILS}/${id}`);
-        setBlog(response.data);
+        const response = await apiClient.get<{ data: BlogDetail; source: 'cache' | 'database' }>(
+          `${GET_BLOG_DETAILS}/${id}`
+        );
+        setBlog(response.data.data);
       } catch (error) {
         console.error('Error fetching blog details:', error);
       } finally {
@@ -129,7 +131,7 @@ export default function BlogDetailsPage() {
         transition={{ duration: 0.4 }}
         className="max-w-4xl mx-auto"
       >
-        {blog.coverImage && (
+        {(blog.image ?? blog.coverImage) && (
           <div className="mb-8">
             <button
               type="button"
@@ -141,7 +143,7 @@ export default function BlogDetailsPage() {
             </button>
             <div className="relative w-full overflow-hidden rounded-md aspect-video">
               <Image
-                src={blog.coverImage}
+                src={blog.image ?? blog.coverImage ?? ''}
                 alt={blog.title}
                 fill
                 unoptimized

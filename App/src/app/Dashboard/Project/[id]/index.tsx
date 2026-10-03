@@ -11,13 +11,13 @@ import {
   CREATE_PROJECT,
   DELETE_PROJECT,
   EDIT_PROJECT,
-  GET_PROJECT_DATA,
+  GET_PROJECT,
 } from "@api";
 import apiClient from "@apiClient";
 import { Input, Button, Loading } from "@components";
 import type { AxiosError } from "axios";
 
-type ProjectDifficulty = "Easy" | "Medium" | "Hard";
+type ProjectDifficulty = "Easy" | "Medium" | "Hard" | "Intermediate" | "Advanced";
 
 type ProjectItem = {
   _id: string;
@@ -25,6 +25,7 @@ type ProjectItem = {
   subtitle?: string;
   description: string;
   images: string;
+  image?: string;
   difficult?: ProjectDifficulty;
   liveDemoLink?: string;
   techStack?: string[];
@@ -34,10 +35,6 @@ type ProjectItem = {
 
 type Params = {
   _id?: string;
-};
-
-type GetProjectDataResponse = {
-  data: ProjectItem;
 };
 
 type ProjectFormValues = {
@@ -77,7 +74,7 @@ const toFormValues = (project: ProjectItem): ProjectFormValues => ({
     ? project.features
     : [""],
   imageFile: null,
-  images: project.images,
+  images: project.image || project.images,
 });
 
 const CreateProject = () => {
@@ -87,7 +84,7 @@ const CreateProject = () => {
 
   const [deleting, setDeleting] = useState(false);
 
-  const isEditMode = Boolean(_id);
+  const isEditMode = Boolean(_id && _id !== "create");
 
   const {
     data: project,
@@ -98,9 +95,8 @@ const CreateProject = () => {
     enabled: isEditMode && Boolean(_id),
     queryFn: async () => {
       const response =
-        await apiClient.put(
-          `${GET_PROJECT_DATA}/${_id}`,
-          {},
+        await apiClient.get(
+          `${GET_PROJECT}/${_id}`,
           {
             withCredentials: true,
           },
@@ -119,7 +115,7 @@ const CreateProject = () => {
   useEffect(() => {
     if (isError && isEditMode) {
       toast.error("Failed to load project");
-      router.push("/admin/project");
+      router.push("/Dashboard/Project");
     }
   }, [isError, isEditMode, router]);
 
@@ -129,61 +125,24 @@ const CreateProject = () => {
         title: yup
           .string()
           .trim()
-          .min(5, "Title must be at least 5 characters")
+          .min(1, "Title is required")
           .required("Title is required"),
 
         subtitle: yup
           .string()
           .trim()
-          .min(10, "Subtitle must be at least 10 characters")
+          .min(1, "Subtitle is required")
           .required("Subtitle is required"),
 
         description: yup
           .string()
           .trim()
-          .min(
-            15,
-            "Description must be at least 15 characters",
-          )
+          .min(1, "Description is required")
           .required("Description is required"),
-
-        liveDemoLink: yup
-          .string()
-          .trim()
-          .url("Enter a valid URL")
-          .required("Live demo URL is required"),
 
         difficult: yup
           .mixed<ProjectDifficulty>()
-          .oneOf(
-            ["Easy", "Medium", "Hard"],
-            "Difficulty is required",
-          )
           .required("Difficulty is required"),
-
-        techStack: yup
-          .array()
-          .of(yup.string().trim())
-          .test(
-            "techStackRequired",
-            "At least one tech stack item is required",
-            (value) =>
-              Boolean(
-                value?.some((item) => item && item.trim().length > 0),
-              ),
-          ),
-
-        features: yup
-          .array()
-          .of(yup.string().trim())
-          .test(
-            "featuresRequired",
-            "At least one feature is required",
-            (value) =>
-              Boolean(
-                value?.some((item) => item && item.trim().length > 0),
-              ),
-          ),
 
         imageFile: yup
           .mixed<File>()
@@ -254,29 +213,6 @@ const CreateProject = () => {
           values.description.trim(),
         );
 
-        payload.append(
-          "techStack",
-          JSON.stringify(
-            values.techStack
-              .map((item) => item.trim())
-              .filter(Boolean),
-          ),
-        );
-
-        payload.append(
-          "features",
-          JSON.stringify(
-            values.features
-              .map((item) => item.trim())
-              .filter(Boolean),
-          ),
-        );
-
-        payload.append(
-          "liveDemoLink",
-          values.liveDemoLink.trim(),
-        );
-
         payload.append("difficult", values.difficult);
 
         if (values.imageFile instanceof File) {
@@ -285,16 +221,16 @@ const CreateProject = () => {
 
         if (isEditMode) {
           const response = await apiClient.put(
-            EDIT_PROJECT,
+            `${EDIT_PROJECT}/${_id}`,
             payload,
             {
               withCredentials: true,
             },
           );
 
-          if (response.status === 200) {
+          if (response.status === 202) {
             toast.success("Project updated successfully");
-            router.push("/admin/project");
+            router.push("/Dashboard/Project");
           }
         } else {
           const response = await apiClient.post(
@@ -305,13 +241,10 @@ const CreateProject = () => {
             },
           );
 
-          if (
-            response.status === 200 ||
-            response.status === 201
-          ) {
+          if (response.status === 200) {
             toast.success("Project created successfully");
             resetForm();
-            router.push("/admin/project");
+            router.push("/Dashboard/Project");
           }
         }
       } catch (error) {
@@ -321,7 +254,7 @@ const CreateProject = () => {
           toast.error(
             "Access denied. Please login as admin.",
           );
-          router.push("/login");
+          router.push("/Auth/Login");
           return;
         }
 
@@ -413,7 +346,7 @@ const CreateProject = () => {
           "Project deleted successfully",
         );
 
-        router.push("/admin/project");
+        router.push("/Dashboard/Project");
       }
     } catch (error) {
       const apiError = error as AxiosError;
@@ -422,7 +355,7 @@ const CreateProject = () => {
         toast.error(
           "Access denied. Please login as admin.",
         );
-        router.push("/login");
+        router.push("/Auth/Login");
         return;
       }
 
@@ -457,7 +390,7 @@ const CreateProject = () => {
           text="Back"
           varient="secondary"
           onClick={() =>
-            router.push("/admin/project")
+            router.push("/Dashboard/Project")
           }
         />
       </div>

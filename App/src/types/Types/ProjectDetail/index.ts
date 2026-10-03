@@ -4,6 +4,8 @@ type ProjectDetail = {
 		title: string;
 		createdAt: string;
 		images: string;
+		image?: string;
+		difficult?: string;
 		subtitle?: string;
 		description: string;
 		techStack?: string[];

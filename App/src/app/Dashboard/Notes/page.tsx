@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@apiClient";
@@ -6,7 +8,8 @@ import { toast } from "react-toastify";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import { Button, Input, Loading } from "@components";
-import type { NoteItem } from "@Type";
+import type { GetNotesResponse, NoteItem } from "@Type";
+import type { AxiosError } from "axios";
 
 const Notes = () => {
     const router = useRouter();
@@ -14,11 +17,14 @@ const Notes = () => {
 
     const [searchTerm, setSearchTerm] = useState("");
 
-    const { data: Note = [], isLoading: loading } = useQuery({
+    const { data: Note = [], isLoading: loading } = useQuery<NoteItem[]>({
         queryKey: ["notes"],
         queryFn: async () => {
-            const response = await apiClient.get(GET_NOTES);
-            return response.data.data as NoteItem[];
+            const response = await apiClient.get<GetNotesResponse>(`${GET_NOTES}?page=1&limit=100`, {
+                withCredentials: true,
+            });
+            const payload = response.data.data;
+            return Array.isArray(payload) ? payload : payload.notes;
         },
     });
 
@@ -34,13 +40,14 @@ const Notes = () => {
                 queryClient.invalidateQueries({ queryKey: ["notes"] });
                 toast.success("Note deleted successfully.");
             }
-        } catch (error: any) {
-            if (error.response && error.response.status === 403) {
+        } catch (error) {
+            const apiError = error as AxiosError<{ message?: string }>;
+            if (apiError.response?.status === 401 || apiError.response?.status === 403) {
                 toast.error("Access denied. Please login as admin.");
-                return router.push("/login");
+                return router.push("/Auth/Login");
             }
             console.error("DeleteNote Error:", error);
-            toast.error("Failed to delete note.");
+            toast.error(apiError.response?.data?.message || "Failed to delete note.");
         }
     };
 
@@ -83,7 +90,7 @@ const Notes = () => {
                                 data-aos="zoom-in"
                             >
                                 <img
-                                    src={item.note_image_url}
+                                    src={item.note_image_url || item.imageUrl}
                                     className="mb-4 w-28 h-28 object-cover"
                                     alt="note"
                                 />

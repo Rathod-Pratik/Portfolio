@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@apiClient";
 import { DELETE_SKILL, GET_SKILL } from "@api";
 import { toast } from "react-toastify";
+import type { AxiosError } from "axios";
 import { FaEdit, FaTrash, FaPlus } from "react-icons/fa";
 import { Loading, Input, Button } from "@components";
 import type { AdminSkillItem } from "@Type";
@@ -39,7 +40,7 @@ const Skill = () => {
   } = useQuery<AdminSkillItem[]>({
     queryKey: ["skills"],
     queryFn: async () => {
-      const response = await apiClient.get(GET_SKILL);
+      const response = await apiClient.get(`${GET_SKILL}?page=1&limit=20`);
       return response.data.data as AdminSkillItem[];
     },
   });
@@ -77,15 +78,19 @@ const Skill = () => {
 
         toast.success("Skill deleted successfully.");
       }
-    } catch (error: any) {
-      if (error.response?.status === 403) {
+    } catch (error) {
+      const apiError = error as AxiosError<{ message?: string }>;
+      if (
+        apiError.response?.status === 401 ||
+        apiError.response?.status === 403
+      ) {
         toast.error("Access denied. Please login as admin.");
-        router.push("/login");
+        router.push("/Auth/Login");
         return;
       }
 
       console.error("DeleteSkill Error:", error);
-      toast.error("Failed to delete skill.");
+      toast.error(apiError.response?.data?.message || "Failed to delete skill.");
     }
   };
 
@@ -108,7 +113,7 @@ const Skill = () => {
           text="New"
           Icon={FaPlus}
           varient="primary"
-          onClick={() => router.push("/admin/skills/create")}
+          onClick={() => router.push("/Dashboard/Skills/create")}
         />
       </div>
 
@@ -167,7 +172,7 @@ const Skill = () => {
                       Icon={FaEdit}
                       varient="secondary"
                       onClick={() =>
-                        router.push(`/admin/skills/edit/${item._id}`)
+                        router.push(`/Dashboard/Skills/${item._id}`)
                       }
                     />
 

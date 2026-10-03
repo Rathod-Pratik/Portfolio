@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useFormik } from "formik";
 import * as yup from "yup";
 import { toast } from "react-toastify";
+import type { AxiosError } from "axios";
 import { FiTrash2, FiUpload } from "react-icons/fi";
 import { CREATE_SKILL, DELETE_SKILL, GET_SKILL, UPDATE_SKILL } from "@api";
 import { apiClient } from "@apiClient";
@@ -52,9 +53,8 @@ const CreateSkill = () => {
         ? params.id[0]
         : null;
 
-  const isEditMode = Boolean(skillId);
+  const isEditMode = Boolean(skillId && skillId !== 'create');
 
-  const [skill, setSkill] = useState<AdminSkillItem | null>(null);
   const [isLoadingSkill, setIsLoadingSkill] = useState(isEditMode);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -79,19 +79,23 @@ const CreateSkill = () => {
             withCredentials: true,
           });
 
-        if (response.status === 200) {
+        if (response.status === 202) {
           toast.success(
             isEditMode
               ? "Skill updated successfully."
               : "Skill created successfully."
           );
 
-          router.push("/admin/skills");
+          router.push("/Dashboard/Skills");
         }
-      } catch (error: any) {
-        if (error.response?.status === 403) {
+      } catch (error) {
+        const apiError = error as AxiosError<{ message?: string }>;
+        if (
+          apiError.response?.status === 401 ||
+          apiError.response?.status === 403
+        ) {
           toast.error("Access denied. Please login as admin.");
-          router.push("/login");
+          router.push("/Auth/Login");
           return;
         }
 
@@ -101,7 +105,7 @@ const CreateSkill = () => {
         );
 
         toast.error(
-          error.response?.data?.message ||
+          apiError.response?.data?.message ||
           (isEditMode
             ? "Failed to update skill."
             : "Failed to create skill.")
@@ -114,8 +118,6 @@ const CreateSkill = () => {
 
   useEffect(() => {
     if (!skillId) {
-      setSkill(null);
-      setIsLoadingSkill(false);
       return;
     }
 
@@ -123,7 +125,7 @@ const CreateSkill = () => {
       try {
         setIsLoadingSkill(true);
 
-        const response = await apiClient.get(GET_SKILL, {
+        const response = await apiClient.get(`${GET_SKILL}?page=1&limit=20`, {
           withCredentials: true,
         });
 
@@ -135,21 +137,23 @@ const CreateSkill = () => {
 
         if (!currentSkill) {
           toast.error("Skill not found.");
-          router.push("/admin/skills");
+          router.push("/Dashboard/Skills");
           return;
         }
-
-        setSkill(currentSkill);
 
         formik.setValues({
           language: currentSkill.language ?? "",
           percentage: String(currentSkill.percentage ?? ""),
           color: currentSkill.color ?? "#3b82f6",
         });
-      } catch (error: any) {
-        if (error.response?.status === 403) {
+      } catch (error) {
+        const apiError = error as AxiosError<{ message?: string }>;
+        if (
+          apiError.response?.status === 401 ||
+          apiError.response?.status === 403
+        ) {
           toast.error("Access denied. Please login as admin.");
-          router.push("/login");
+          router.push("/Auth/Login");
           return;
         }
 
@@ -188,19 +192,23 @@ const CreateSkill = () => {
 
       if (response.status === 200) {
         toast.success("Skill deleted successfully.");
-        router.push("/admin/skills");
+        router.push("/Dashboard/Skills");
       }
-    } catch (error: any) {
-      if (error.response?.status === 403) {
+    } catch (error) {
+      const apiError = error as AxiosError<{ message?: string }>;
+      if (
+        apiError.response?.status === 401 ||
+        apiError.response?.status === 403
+      ) {
         toast.error("Access denied. Please login as admin.");
-        router.push("/login");
+        router.push("/Auth/Login");
         return;
       }
 
       console.error("DeleteSkill Error:", error);
 
       toast.error(
-        error.response?.data?.message ||
+        apiError.response?.data?.message ||
         "Failed to delete skill."
       );
     } finally {
@@ -231,7 +239,7 @@ const CreateSkill = () => {
             type="button"
             text="Back"
             varient="secondary"
-            onClick={() => router.push("/admin/skills")}
+            onClick={() => router.push("/Dashboard/Skills")}
           />
 
           {isEditMode && (

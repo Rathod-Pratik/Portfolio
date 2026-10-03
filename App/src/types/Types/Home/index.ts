@@ -1,8 +1,17 @@
 type Hero = {
+  _id?: string;
   greeting: string;
+  name: string;
   roles: string[];
   description: string;
   image: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type HeroResponse = {
+  data: Hero;
+  source: "cache" | "database";
 };
 
 type Services = {
@@ -12,6 +21,29 @@ type Services = {
     description: string;
     image: string;
   }[];
+};
+
+type ExpertiseResponse = {
+  data: Services["data"];
+  source: "cache" | "database";
+};
+
+type ExperienceItem = {
+  _id?: string;
+  year: string;
+  duration: string;
+  title: string;
+  company: string;
+  description: string;
+};
+
+type ExperienceResponse = {
+  data: ExperienceItem[];
+  source: "cache" | "database";
+};
+
+type ExperienceProps = {
+  data: ExperienceItem[];
 };
 
 type SkillCardProps = {
@@ -41,11 +73,16 @@ type SkillsProps = {
 
 export type {
   Hero,
+  HeroResponse,
   Services,
   SkillCardProps,
   SkillItem,
   ResumeFile,
   HeroProps,
   ServicesProps,
+  ExpertiseResponse,
+  ExperienceItem,
+  ExperienceResponse,
+  ExperienceProps,
   SkillsProps,
 };

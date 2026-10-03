@@ -1,3 +1,5 @@
+"use client";
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useFormik } from "formik";
@@ -10,8 +12,8 @@ import { apiClient } from "@apiClient";
 import { Button, Input } from "@components";
 
 type ResumeItem = {
-    _id: string;
-    CV: string;
+    _id?: string;
+    CV?: string;
 };
 
 const Resume = () => {
@@ -29,7 +31,12 @@ const Resume = () => {
                 withCredentials: true,
             });
 
-            return response.data.data[0] ?? null;
+            const data = response.data.data;
+            if (typeof data === "string") {
+                return { CV: data };
+            }
+
+            return data ?? null;
         },
     });
 
@@ -72,6 +79,13 @@ const Resume = () => {
                     return;
                 }
 
+                if (resumeFile && !resumeFile._id) {
+                    toast.error(
+                        "The CV record ID is unavailable, so it cannot be replaced."
+                    );
+                    return;
+                }
+
                 const formData = new FormData();
 
                 formData.append("file", values.file);
@@ -98,7 +112,7 @@ const Resume = () => {
                     );
                 }
 
-                if (response.status === 200 || response.status === 201) {
+                if (response.status === 202) {
                     toast.success(
                         resumeFile?._id
                             ? "Resume updated successfully"
@@ -116,12 +130,15 @@ const Resume = () => {
                 const apiError =
                     error as AxiosError<{ message?: string }>;
 
-                if (apiError.response?.status === 403) {
+                if (
+                    apiError.response?.status === 401 ||
+                    apiError.response?.status === 403
+                ) {
                     toast.error(
                         "Access denied. Please login as admin."
                     );
 
-                    router.push("/login");
+                    router.push("/Auth/Login");
                     return;
                 }
 

@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormik } from "formik";
@@ -29,7 +31,7 @@ const validationSchema = yup.object({
     password: yup
         .string()
         .required("Password is required.")
-        .min(6, "Password must be at least 6 characters."),
+        .min(1, "Password is required."),
 });
 
 const Login = () => {
@@ -81,7 +83,7 @@ const Login = () => {
                 <div className="lg:w-1/2 hidden md:flex items-center justify-center p-6 sm:p-12">
                     <div className="text-center text-white">
                         <img
-                            src="/Login_image.png"
+                            src="/Image/Login_image.png"
                             alt="Welcome illustration"
                             className="max-w-full h-auto mx-auto mb-8 rounded-lg shadow-lg"
                         />
