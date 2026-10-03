@@ -20,6 +20,7 @@ import HeroRoutes from '@modules/Hero/Hero.route.ts';
 import ExpertiseRoutes from '@modules/Expertice/Expertise.route.ts';
 import AboutRoutes from '@modules/About/About.routes.ts';
 import LoggerRoutes from '@modules/Logger/Logger.routes.ts';
+import NotificationRoutes from '@modules/Notification/Notification.route.ts';
 
 
 import cookieParser from "cookie-parser";
@@ -72,6 +73,7 @@ app.use("/hero", HeroRoutes);
 app.use("/expertise", ExpertiseRoutes);
 app.use("/about", AboutRoutes);
 app.use("/logger", LoggerRoutes);
+app.use("/notifications", NotificationRoutes);
 
 app.get("/auth/check", (req, res) => {
   const token = req.cookies.admin;

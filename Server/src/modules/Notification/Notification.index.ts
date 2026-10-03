@@ -6,10 +6,23 @@ export {
 } from "./Notification.service.ts";
 
 export {
-    NotificationType,
-} from "./Notification.types.ts";
+    getNotifications,
+    getNotificationById,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    clearAllNotifications,
+} from "./Notification.controller.ts";
 
-export type {
-    INotification,
-    INotificationJob,
+export { default as NotificationRoutes } from "./Notification.route.ts";
+
+export {
+    NotificationModel,
+    type NotificationDocument,
+} from "./Notification.model.ts";
+
+export {
+    NotificationType,
+    type INotification,
+    type INotificationJob,
 } from "./Notification.types.ts";

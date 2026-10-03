@@ -5,11 +5,16 @@ export enum NotificationType {
 }
 
 export interface INotification {
+    _id?: string;
     type: NotificationType;
     title: string;
     message: string;
+    isRead?: boolean;
     userId?: string;
     data?: Record<string, unknown>;
+    isDeleted?: boolean;
+    createdAt?: Date;
+    updatedAt?: Date;
 }
 
 export interface INotificationJob {

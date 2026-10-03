@@ -1,0 +1,2018 @@
+================================================================================
+PORTFOLIO API SPECIFICATION & PROMPTS
+================================================================================
+
+================================================================================
+1. ABOUT MODULE
+================================================================================
+Base URL: /about
+Base Server URL: http://localhost:<PORT>/about (or your production domain)
+
+--------------------------------------------------------------------------------
+1.1 GET ABOUT DETAILS
+--------------------------------------------------------------------------------
+Description: Retrieves the About section information (served from Redis cache if available, otherwise MongoDB).
+Access: Public (No Authentication Required)
+
+[REQUEST]
+• Method: GET
+• Endpoint: /about
+• Headers:
+    Accept: application/json
+
+[RESPONSES]
+• 200 OK (Success - Cached or Database):
+    {
+      "data": {
+        "_id": "664f1c9d2f8a1a001e3b4c12",
+        "content": "Hello! I am a Full Stack Developer specializing in TypeScript, Node.js, Express, and React...",
+        "createdAt": "2026-01-15T10:00:00.000Z",
+        "updatedAt": "2026-02-01T12:30:00.000Z",
+        "__v": 0
+      },
+      "source": "cache" // or "database"
+    }
+
+• 404 Not Found:
+    {
+      "message": "About information not found"
+    }
+
+• 500 Internal Server Error:
+    {
+      "message": "Internal server error"
+    }
+
+--------------------------------------------------------------------------------
+1.2 UPDATE ABOUT DETAILS
+--------------------------------------------------------------------------------
+Description: Updates About content. Queues update job to BullMQ worker, invalidates/updates Redis cache, and triggers notification.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /about
+• Headers:
+    Content-Type: application/json
+    Accept: application/json
+• Cookies / Credentials:
+    admin=<jwt_token> (Include credentials: "include" / withCredentials: true)
+• Body (JSON):
+    {
+      "content": "Updated about section content describing experience, background, and tech stack."
+    }
+
+[VALIDATION RULES]
+• content: Required string, minimum length 1 character.
+• strict schema: Disallows extraneous unknown fields.
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "message": "About updated successfully"
+    }
+
+• 400 Bad Request (Validation Error):
+    {
+      "message": [
+        {
+          "code": "too_small",
+          "minimum": 1,
+          "type": "string",
+          "inclusive": true,
+          "exact": false,
+          "message": "Content is required",
+          "path": ["content"]
+        }
+      ]
+    }
+
+• 403 Forbidden (Missing admin cookie):
+    {
+      "success": false,
+      "message": "Access denied. Admin cookie is missing."
+    }
+
+• 401 Unauthorized (Invalid / Expired token):
+    {
+      "success": false,
+      "message": "Invalid admin cookie. Authentication failed."
+    }
+
+• 500 Internal Server Error:
+    {
+      "message": "Internal server error"
+    }
+
+--------------------------------------------------------------------------------
+ABOUT MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services/hooks for the About module:
+1. Fetch About: Call `GET /about` to display the about details (`data.content`). Handle loading, empty state (404), and error states.
+2. Edit About (Admin): Call `PUT /about` with payload `{ content: string }` and credentials enabled (`withCredentials: true` / `credentials: 'include'`). On 200 OK, show success toast and invalidate cache/refetch query. Handle 400 validation, 401/403 authorization, and 500 errors."
+
+
+================================================================================
+2. AUTH MODULE
+================================================================================
+Base URL: /auth
+Base Server URL: http://localhost:<PORT>/auth (or your production domain)
+
+--------------------------------------------------------------------------------
+2.1 SIGNUP (REGISTER ADMIN)
+--------------------------------------------------------------------------------
+Description: Creates a new admin account with hashed password.
+Access: Public
+
+[REQUEST]
+• Method: POST
+• Endpoint: /auth/signup
+• Headers:
+    Content-Type: application/json
+    Accept: application/json
+• Body (JSON):
+    {
+      "name": "Pratik Rathod",
+      "email": "admin@example.com",
+      "password": "strongPassword123"
+    }
+
+[VALIDATION RULES]
+• name: Required string, minimum 2 characters.
+• email: Required valid email address.
+• password: Required string, minimum 6 characters.
+• strict schema.
+
+[RESPONSES]
+• 201 Created (Success):
+    {
+      "success": true,
+      "message": "Account created successfully",
+      "user": {
+        "id": "664f1c9d2f8a1a001e3b4c10",
+        "email": "admin@example.com",
+        "FirstName": "Pratik",
+        "LastName": "Rathod"
+      }
+    }
+
+• 400 Bad Request (Validation failure or User already exists):
+    {
+      "error": "User already exists" // or validation error message
+    }
+
+• 500 Internal Server Error:
+    {
+      "error": "Internal Server Error"
+    }
+
+--------------------------------------------------------------------------------
+2.2 LOGIN
+--------------------------------------------------------------------------------
+Description: Authenticates admin credentials, sets an HTTP-only 'admin' cookie (1-day expiry), and returns user details + JWT token.
+Access: Public
+
+[REQUEST]
+• Method: POST
+• Endpoint: /auth/login
+• Headers:
+    Content-Type: application/json
+    Accept: application/json
+• Body (JSON):
+    {
+      "email": "admin@example.com",
+      "password": "strongPassword123"
+    }
+
+[VALIDATION RULES]
+• email: Required valid email address.
+• password: Required string, min 1 character.
+• strict schema.
+
+[RESPONSES]
+• 200 OK (Success):
+    Set-Cookie: admin=<jwt_token>; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax (or None in production)
+    {
+      "message": "Login successful",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "user": {
+        "id": "664f1c9d2f8a1a001e3b4c10",
+        "email": "admin@example.com",
+        "FirstName": "Pratik",
+        "LastName": "Rathod"
+      }
+    }
+
+• 400 Bad Request (Account not found or Invalid password):
+    {
+      "error": "Account not found" // or "Please enter valid Password"
+    }
+
+• 500 Internal Server Error:
+    {
+      "error": "Internal Server Error"
+    }
+
+--------------------------------------------------------------------------------
+2.3 VERIFY LOGIN OTP
+--------------------------------------------------------------------------------
+Description: Verifies 2FA / Login OTP (from Redis cache or DB backup), sets 'admin' cookie, and returns authenticated user info.
+Access: Public
+
+[REQUEST]
+• Method: POST
+• Endpoint: /auth/login-verify
+• Headers:
+    Content-Type: application/json
+    Accept: application/json
+• Body (JSON):
+    {
+      "email": "admin@example.com",
+      "otp": "123456"
+    }
+
+[VALIDATION RULES]
+• email: Required valid email address.
+• otp: Required 6-digit numeric string/number.
+• strict schema.
+
+[RESPONSES]
+• 200 OK (Success):
+    Set-Cookie: admin=<jwt_token>; HttpOnly; Path=/; Max-Age=86400; SameSite=Lax
+    {
+      "userInfo": {
+        "_id": "664f1c9d2f8a1a001e3b4c10",
+        "FirstName": "Pratik",
+        "LastName": "Rathod",
+        "email": "admin@example.com",
+        "role": "admin"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "message": "Admin login successful"
+    }
+
+• 400 Bad Request:
+    {
+      "error": "Invalid OTP" // or "OTP not requested or expired"
+    }
+
+• 404 Not Found:
+    {
+      "error": "Account not found"
+    }
+
+• 500 Internal Server Error:
+    {
+      "error": "Internal Server Error"
+    }
+
+--------------------------------------------------------------------------------
+2.4 LOGOUT
+--------------------------------------------------------------------------------
+Description: Clears the 'admin' HTTP-only cookie.
+Access: Public
+
+[REQUEST]
+• Method: GET
+• Endpoint: /auth/logout
+• Headers:
+    Accept: application/json
+• Credentials:
+    credentials: "include" / withCredentials: true
+
+[RESPONSES]
+• 200 OK (Success):
+    Set-Cookie: admin=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly
+    {
+      "message": "Logged out successfully"
+    }
+
+• 500 Internal Server Error:
+    {
+      "error": "Logout failed"
+    }
+
+--------------------------------------------------------------------------------
+2.5 FORGOT PASSWORD (REQUEST OTP)
+--------------------------------------------------------------------------------
+Description: Generates a 6-digit OTP, stores hashed OTP in Redis with 10-minute TTL, and sends OTP to user's email.
+Access: Public
+
+[REQUEST]
+• Method: POST
+• Endpoint: /auth/forgot-password
+• Headers:
+    Content-Type: application/json
+    Accept: application/json
+• Body (JSON):
+    {
+      "email": "admin@example.com"
+    }
+
+[VALIDATION RULES]
+• email: Required valid email address.
+• strict schema.
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "message": "OTP sent successfully to your email",
+      "email": "admin@example.com"
+    }
+
+• 400 Bad Request (Validation failure):
+    {
+      "error": "Please provide a valid email address"
+    }
+
+• 404 Not Found:
+    {
+      "error": "Account not found"
+    }
+
+• 500 Internal Server Error:
+    {
+      "error": "Failed to send OTP"
+    }
+
+--------------------------------------------------------------------------------
+2.6 VERIFY FORGOT PASSWORD OTP
+--------------------------------------------------------------------------------
+Description: Compares OTP against Redis cache. On match, updates cache state to `isVerified: true` for password reset.
+Access: Public
+
+[REQUEST]
+• Method: POST
+• Endpoint: /auth/verify-otp
+• Headers:
+    Content-Type: application/json
+    Accept: application/json
+• Body (JSON):
+    {
+      "email": "admin@example.com",
+      "otp": "654321"
+    }
+
+[VALIDATION RULES]
+• email: Required valid email address.
+• otp: Required 6-digit numeric string/number.
+• strict schema.
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "message": "OTP verified successfully",
+      "email": "admin@example.com"
+    }
+
+• 400 Bad Request:
+    {
+      "error": "Invalid OTP" // or "OTP has expired or was not requested. Please request a new OTP."
+    }
+
+• 500 Internal Server Error:
+    {
+      "error": "Failed to verify OTP"
+    }
+
+--------------------------------------------------------------------------------
+2.7 RESET PASSWORD
+--------------------------------------------------------------------------------
+Description: Resets admin password if OTP was successfully verified in Redis. Hashes new password and deletes Redis OTP cache key.
+Access: Public
+
+[REQUEST]
+• Method: POST
+• Endpoint: /auth/reset-password
+• Headers:
+    Content-Type: application/json
+    Accept: application/json
+• Body (JSON):
+    {
+      "email": "admin@example.com",
+      "password": "brandNewSecurePassword123"
+    }
+
+[VALIDATION RULES]
+• email: Required valid email address.
+• password: Required string, minimum 6 characters.
+• strict schema.
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "message": "Password reset successfully"
+    }
+
+• 400 Bad Request:
+    {
+      "error": "OTP verification is required or has expired. Please verify OTP first."
+    }
+
+• 404 Not Found:
+    {
+      "error": "Account not found"
+    }
+
+• 500 Internal Server Error:
+    {
+      "error": "Failed to reset password"
+    }
+
+--------------------------------------------------------------------------------
+2.8 CHECK AUTHENTICATION STATUS
+--------------------------------------------------------------------------------
+Description: Verifies if the admin session cookie is active and returns decoded token payload.
+Access: Protected (Checks 'admin' cookie)
+
+[REQUEST]
+• Method: GET
+• Endpoint: /auth/check
+• Headers:
+    Accept: application/json
+• Credentials:
+    credentials: "include" / withCredentials: true
+
+[RESPONSES]
+• 200 OK (Authenticated):
+    {
+      "authenticated": true,
+      "user": {
+        "id": "664f1c9d2f8a1a001e3b4c10",
+        "email": "admin@example.com",
+        "role": "admin",
+        "iat": 1718000000,
+        "exp": 1718086400
+      }
+    }
+
+• 401 Unauthorized (Not logged in or expired token):
+    {
+      "authenticated": false
+    }
+
+• 500 Internal Server Error:
+    {
+      "authenticated": false,
+      "message": "JWT secret is missing"
+    }
+
+--------------------------------------------------------------------------------
+AUTH MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend authentication flow with Axios / React Context:
+
+1. Setup Axios Client:
+   - Configure `axios.create({ baseURL: '...', withCredentials: true })` to always send/receive HTTP-only cookies.
+
+2. Auth Context & State:
+   - On app mount, call `GET /auth/check` to verify active session and store `user` object in AuthContext.
+   - Login Handler: Call `POST /auth/login` with `{ email, password }`. On success, set user in state and redirect to admin dashboard.
+   - 2FA/Login OTP Handler: If 2FA enabled, call `POST /auth/login-verify` with `{ email, otp }`.
+   - Logout Handler: Call `GET /auth/logout`, clear user state from context, and redirect to login page.
+
+3. Forgot & Reset Password Multi-Step Flow:
+   - Step 1: Call `POST /auth/forgot-password` with `{ email }` to send OTP.
+   - Step 2: Call `POST /auth/verify-otp` with `{ email, otp }` to validate the 6-digit code.
+   - Step 3: Call `POST /auth/reset-password` with `{ email, password }` to save the new password and navigate to login.
+
+4. Error & Feedback Handling:
+   - Display toast/alert for `error` messages from backend responses (400, 401, 403, 404, 500)."
+
+
+================================================================================
+3. BLOG MODULE
+================================================================================
+Base URL: /blogs
+Base Server URL: http://localhost:<PORT>/blogs (or your production domain)
+
+--------------------------------------------------------------------------------
+3.1 CREATE BLOG
+--------------------------------------------------------------------------------
+Description: Uploads blog cover image, validates blog fields, and queues blog creation job to BullMQ worker.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: POST
+• Endpoint: /blogs/create
+• Headers:
+    Content-Type: multipart/form-data
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Form Data (multipart/form-data):
+    title: "Understanding Microservices Architecture" (string, required)
+    slug: "understanding-microservices-architecture" (string, required)
+    excerpt: "A deep dive into microservices patterns and best practices." (string, required)
+    content: "# Full Markdown Content Here..." (string, required)
+    tags: "Node.js, Architecture, System Design" (comma-separated string or array, e.g. ["Node.js", "System Design"])
+    isPublished: "true" (boolean / string: "true" | "false")
+    file: <image_file> (File binary: JPEG, PNG, WEBP)
+
+[VALIDATION RULES]
+• title: Required string, min 1 character.
+• slug: Required string, min 1 character (lowercase, unique).
+• excerpt: Required string, min 1 character.
+• content: Required string, min 1 character.
+• tags: Array of strings or comma-separated string or JSON string array.
+• isPublished: Boolean or string boolean ("true"/"false").
+• file / image: Valid image file (JPEG, PNG, WEBP).
+
+[RESPONSES]
+• 201 Created (Success - Queued for processing):
+    {
+      "message": "Blog \"Understanding Microservices Architecture\" was added to the creation queue and is being processed."
+    }
+
+• 400 Bad Request (Validation or Image Error):
+    {
+      "message": "Invalid request body",
+      "error": [...]
+    }
+
+• 403 Forbidden (Missing admin cookie):
+    {
+      "success": false,
+      "message": "Access denied. Admin cookie is missing."
+    }
+
+• 401 Unauthorized (Invalid / Expired token):
+    {
+      "success": false,
+      "message": "Invalid admin cookie. Authentication failed."
+    }
+
+• 500 Internal Server Error:
+    {
+      "message": "Internal server error"
+    }
+
+--------------------------------------------------------------------------------
+3.2 GET ALL BLOGS (PAGINATED & CACHED)
+--------------------------------------------------------------------------------
+Description: Retrieves a paginated list of non-deleted blogs with S3 signed image URLs. Cached in Redis with versioning.
+Access: Public (Tracks view analytics via updateAdminViews middleware)
+
+[REQUEST]
+• Method: GET
+• Endpoint: /blogs/get?page=1&limit=10
+• Headers:
+    Accept: application/json
+• Query Parameters:
+    page: 1 (number, optional, default: 1, min: 1)
+    limit: 10 (number, optional, default: 10, min: 1, max: 100)
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "blog": [
+        {
+          "_id": "664f1c9d2f8a1a001e3b4c20",
+          "title": "Understanding Microservices Architecture",
+          "slug": "understanding-microservices-architecture",
+          "excerpt": "A deep dive into microservices patterns and best practices.",
+          "content": "# Full Markdown Content Here...",
+          "image": "https://s3.amazonaws.com/your-bucket/Blog/image.jpg?X-Amz-Signature=...",
+          "tags": ["Node.js", "Architecture", "System Design"],
+          "author": "Admin",
+          "isPublished": true,
+          "isDeleted": false,
+          "createdAt": "2026-02-10T08:00:00.000Z",
+          "updatedAt": "2026-02-10T08:00:00.000Z",
+          "__v": 0
+        }
+      ],
+      "source": "cache" // or "database"
+    }
+
+• 500 Internal Server Error:
+    {
+      "message": "Error fetching blogs"
+    }
+
+--------------------------------------------------------------------------------
+3.3 GET SINGLE BLOG BY ID / SLUG
+--------------------------------------------------------------------------------
+Description: Retrieves single blog details with signed image URL. Cached in Redis by blog ID.
+Access: Public (Tracks view analytics via updateAdminViews middleware)
+
+[REQUEST]
+• Method: GET
+• Endpoint: /blogs/:id
+• Path Parameters:
+    id: "664f1c9d2f8a1a001e3b4c20" (Blog MongoDB ID)
+• Headers:
+    Accept: application/json
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "data": {
+        "_id": "664f1c9d2f8a1a001e3b4c20",
+        "title": "Understanding Microservices Architecture",
+        "slug": "understanding-microservices-architecture",
+        "excerpt": "A deep dive into microservices patterns and best practices.",
+        "content": "# Full Markdown Content Here...",
+        "image": "https://s3.amazonaws.com/your-bucket/Blog/image.jpg?X-Amz-Signature=...",
+        "tags": ["Node.js", "Architecture", "System Design"],
+        "author": "Admin",
+        "isPublished": true,
+        "isDeleted": false,
+        "createdAt": "2026-02-10T08:00:00.000Z",
+        "updatedAt": "2026-02-10T08:00:00.000Z",
+        "__v": 0
+      },
+      "source": "cache" // or "database"
+    }
+
+• 404 Not Found:
+    {
+      "message": "Blog not found"
+    }
+
+• 500 Internal Server Error:
+    {
+      "message": "Error fetching blog"
+    }
+
+--------------------------------------------------------------------------------
+3.4 UPDATE BLOG
+--------------------------------------------------------------------------------
+Description: Updates existing blog fields and/or uploads a replacement image. Queues update job to BullMQ worker.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /blogs/:id
+• Path Parameters:
+    id: "664f1c9d2f8a1a001e3b4c20" (Blog MongoDB ID)
+• Headers:
+    Content-Type: multipart/form-data (or application/json if no new image file is provided)
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Form Data / Body (All fields optional for partial update):
+    title: "Updated Blog Title"
+    slug: "updated-blog-title"
+    excerpt: "Updated blog excerpt..."
+    content: "Updated markdown content..."
+    tags: "TypeScript, FullStack"
+    isPublished: "true"
+    file: <optional_new_image_file>
+
+[RESPONSES]
+• 202 Accepted (Success - Queued for processing):
+    {
+      "message": "Blog update added to processing queue"
+    }
+
+• 400 Bad Request / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+3.5 DELETE BLOG
+--------------------------------------------------------------------------------
+Description: Permanently deletes blog from database and increments cache versions to invalidate cached lists & details.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: DELETE
+• Endpoint: /blogs/:id
+• Path Parameters:
+    id: "664f1c9d2f8a1a001e3b4c20" (Blog MongoDB ID)
+• Headers:
+    Accept: application/json
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "message": "Blog deleted successfully"
+    }
+
+• 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+BLOG MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services and React Query hooks for the Blog module:
+1. Public Blog Listing & Details: Call `GET /blogs/get?page=${page}&limit=${limit}` for cards and `GET /blogs/${id}` for full markdown articles.
+2. Admin Blog Management: Create (`POST /blogs/create`), Edit (`PUT /blogs/${id}`), and Delete (`DELETE /blogs/${id}`) using `FormData` and `withCredentials: true`."
+
+
+================================================================================
+4. CONTACT MODULE
+================================================================================
+Base URL: /contact
+Base Server URL: http://localhost:<PORT>/contact (or your production domain)
+
+--------------------------------------------------------------------------------
+4.1 CREATE CONTACT (PUBLIC INQUIRY FORM)
+--------------------------------------------------------------------------------
+Description: Submits a new contact/inquiry message from portfolio visitors. Queues message processing and updates admin view analytics.
+Access: Public
+
+[REQUEST]
+• Method: POST
+• Endpoint: /contact/createcontact
+• Headers:
+    Content-Type: application/json
+    Accept: application/json
+• Body (JSON):
+    {
+      "name": "Jane Doe",
+      "email": "jane@example.com",
+      "mobile": "+1 555-123-4567",
+      "projectType": "Web Development",
+      "budget": "$3,000 - $5,000",
+      "message": "I would like to discuss building a modern SaaS web app."
+    }
+
+[VALIDATION RULES]
+• name: Required string, min 1 character.
+• email: Required valid email address.
+• mobile: Required string, min 1 character.
+• projectType: Required string, min 1 character.
+• budget: Required string, min 1 character.
+• message: Required string, min 1 character.
+• status: Optional enum ("new" | "contacted" | "inProgress" | "closed"). Defaults to "new".
+
+[RESPONSES]
+• 201 Created (Success):
+    {
+      "success": true,
+      "message": "Contact created successfully"
+    }
+
+• 400 Bad Request / 500 Internal Server Error
+
+--------------------------------------------------------------------------------
+4.2 GET ALL CONTACT MESSAGES (ADMIN INBOX)
+--------------------------------------------------------------------------------
+Description: Retrieves a paginated list of non-deleted contact messages. Cached in Redis for 1 hour with cache version invalidation.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: GET
+• Endpoint: /contact/getcontact?page=1&limit=10
+• Headers:
+    Accept: application/json
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Query Parameters:
+    page: 1 (number, optional, default: 1)
+    limit: 10 (number, optional, default: 10)
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "data": [
+        {
+          "_id": "664f1c9d2f8a1a001e3b4c30",
+          "name": "Jane Doe",
+          "email": "jane@example.com",
+          "mobile": "+1 555-123-4567",
+          "projectType": "Web Development",
+          "budget": "$3,000 - $5,000",
+          "message": "I would like to discuss building a modern SaaS web app.",
+          "status": "new",
+          "isDeleted": false,
+          "createdAt": "2026-02-15T09:00:00.000Z",
+          "updatedAt": "2026-02-15T09:00:00.000Z",
+          "__v": 0
+        }
+      ],
+      "source": "cache" // or "database"
+    }
+
+• 403 Forbidden / 401 Unauthorized / 500 Internal Server Error
+
+--------------------------------------------------------------------------------
+4.3 UPDATE CONTACT STATUS
+--------------------------------------------------------------------------------
+Description: Updates lead status for a contact message and invalidates Redis list cache.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /contact/updatecontactstatus/:_id
+• Path Parameters:
+    _id: "664f1c9d2f8a1a001e3b4c30" (Contact MongoDB ID)
+• Headers:
+    Content-Type: application/json
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Body (JSON):
+    {
+      "_id": "664f1c9d2f8a1a001e3b4c30",
+      "status": "inProgress" // "new" | "contacted" | "inProgress" | "closed"
+    }
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "data": {
+        "_id": "664f1c9d2f8a1a001e3b4c30",
+        "name": "Jane Doe",
+        "email": "jane@example.com",
+        "status": "inProgress",
+        "updatedAt": "2026-02-16T11:00:00.000Z"
+      }
+    }
+
+• 400 Bad Request / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+4.4 DELETE CONTACT
+--------------------------------------------------------------------------------
+Description: Soft-deletes a contact message (`isDeleted: true`) and invalidates cache.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: DELETE
+• Endpoint: /contact/deletecontact/:_id
+• Path Parameters:
+    _id: "664f1c9d2f8a1a001e3b4c30" (Contact MongoDB ID)
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "message": "Contact Deleted successfully"
+    }
+
+• 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+CONTACT MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services for Contact form & Admin inbox:
+1. Visitor Form: Call `POST /contact/createcontact` with `{ name, email, mobile, projectType, budget, message }`.
+2. Admin Inbox: Query `GET /contact/getcontact`, update status with `PUT /contact/updatecontactstatus/${id}`, and delete with `DELETE /contact/deletecontact/${id}`."
+
+
+================================================================================
+5. EXPERTISE MODULE
+================================================================================
+Base URL: /expertise
+Base Server URL: http://localhost:<PORT>/expertise (or your production domain)
+
+--------------------------------------------------------------------------------
+5.1 CREATE EXPERTISE
+--------------------------------------------------------------------------------
+Description: Uploads expertise icon/image to S3, validates fields, and queues expertise creation in BullMQ.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: POST
+• Endpoint: /expertise/
+• Headers:
+    Content-Type: multipart/form-data
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Form Data:
+    title: "Backend Architecture & Distributed Systems" (string, required)
+    description: "Designing scalable microservices, Redis caching layers, and high-throughput BullMQ queues." (string, required)
+    file: <image_file> (Image binary, required)
+
+[RESPONSES]
+• 202 Accepted (Success - Queued):
+    {
+      "message": "Expertise \"Backend Architecture & Distributed Systems\" was added to the creation queue and is being processed.",
+      "jobId": "123"
+    }
+
+• 400 Bad Request / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+5.2 GET ALL EXPERTISE
+--------------------------------------------------------------------------------
+Description: Retrieves all expertise items sorted by creation order with signed S3 image URLs. Cached in Redis.
+Access: Public
+
+[REQUEST]
+• Method: GET
+• Endpoint: /expertise/?page=1&limit=10
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "data": [
+        {
+          "_id": "664f1c9d2f8a1a001e3b4c40",
+          "title": "Backend Architecture & Distributed Systems",
+          "description": "Designing scalable microservices, Redis caching layers, and high-throughput BullMQ queues.",
+          "image": "https://s3.amazonaws.com/your-bucket/Expertise/icon.png?X-Amz-Signature=...",
+          "isDeleted": false,
+          "createdAt": "2026-01-10T10:00:00.000Z",
+          "updatedAt": "2026-01-10T10:00:00.000Z",
+          "__v": 0
+        }
+      ],
+      "source": "cache" // or "database"
+    }
+
+• 500 Internal Server Error
+
+--------------------------------------------------------------------------------
+5.3 GET EXPERTISE BY ID
+--------------------------------------------------------------------------------
+Description: Retrieves single expertise details with signed image URL. Cached in Redis.
+Access: Public
+
+[REQUEST]
+• Method: GET
+• Endpoint: /expertise/:id
+• Path Parameters:
+    id: "664f1c9d2f8a1a001e3b4c40"
+
+[RESPONSES]
+• 200 OK (Success) / 404 Not Found / 500 Internal Server Error
+
+--------------------------------------------------------------------------------
+5.4 UPDATE EXPERTISE
+--------------------------------------------------------------------------------
+Description: Updates expertise fields and/or uploads a replacement image. Queues update in BullMQ worker.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /expertise/:id
+• Path Parameters:
+    id: "664f1c9d2f8a1a001e3b4c40"
+• Form Data / Body:
+    title: "Updated Title" (optional)
+    description: "Updated Description" (optional)
+    file: <optional_new_image>
+
+[RESPONSES]
+• 202 Accepted / 400 Bad Request / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+5.5 DELETE EXPERTISE
+--------------------------------------------------------------------------------
+Description: Soft-deletes expertise (`isDeleted: true`) and invalidates cache versions.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: DELETE
+• Endpoint: /expertise/:id
+
+[RESPONSES]
+• 200 OK (`{ "message": "Expertise deleted successfully" }`) / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+EXPERTISE MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services for Expertise:
+1. Public: Call `GET /expertise/` to display expertise cards.
+2. Admin: Create (`POST /expertise/`), Update (`PUT /expertise/${id}`), and Delete (`DELETE /expertise/${id}`) with `withCredentials: true`."
+
+
+================================================================================
+6. EXPERIENCE MODULE
+================================================================================
+Base URL: /experiences
+Base Server URL: http://localhost:<PORT>/experiences (or your production domain)
+
+--------------------------------------------------------------------------------
+6.1 CREATE EXPERIENCE
+--------------------------------------------------------------------------------
+Description: Validates experience fields and queues creation job to BullMQ worker.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: POST
+• Endpoint: /experiences/
+• Headers:
+    Content-Type: application/json
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Body (JSON):
+    {
+      "year": "2024 - Present",
+      "duration": "1 yr 6 mos",
+      "title": "Senior Full Stack Engineer",
+      "company": "Tech Innovations Inc.",
+      "description": "Led backend architecture for high-concurrency microservices and built responsive React user interfaces."
+    }
+
+[RESPONSES]
+• 202 Accepted / 400 Bad Request / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+6.2 GET ALL EXPERIENCES
+--------------------------------------------------------------------------------
+Description: Retrieves all experience timeline entries sorted by newest first. Cached in Redis.
+Access: Public
+
+[REQUEST]
+• Method: GET
+• Endpoint: /experiences/?page=1&limit=10
+
+[RESPONSES]
+• 200 OK (Success) / 500 Server Error
+
+--------------------------------------------------------------------------------
+6.3 GET EXPERIENCE BY ID
+--------------------------------------------------------------------------------
+Description: Retrieves single experience entry by ID. Cached in Redis.
+Access: Public
+
+[REQUEST]
+• Method: GET
+• Endpoint: /experiences/:id
+
+[RESPONSES]
+• 200 OK (Success) / 404 Not Found / 500 Server Error
+
+--------------------------------------------------------------------------------
+6.4 UPDATE EXPERIENCE
+--------------------------------------------------------------------------------
+Description: Updates experience fields and queues update in BullMQ worker.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /experiences/:id
+• Body (JSON): `{ year?, duration?, title?, company?, description? }`
+
+[RESPONSES]
+• 202 Accepted / 400 Bad Request / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+6.5 DELETE EXPERIENCE
+--------------------------------------------------------------------------------
+Description: Soft-deletes experience entry (`isDeleted: true`) and invalidates cache versions.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: DELETE
+• Endpoint: /experiences/:id
+
+[RESPONSES]
+• 200 OK (`{ "message": "Experience deleted successfully" }`) / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+EXPERIENCE MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services for Experience Timeline:
+1. Public: Call `GET /experiences/` to render timeline cards.
+2. Admin: Create (`POST /experiences/`), Update (`PUT /experiences/${id}`), and Delete (`DELETE /experiences/${id}`) with `withCredentials: true`."
+
+
+================================================================================
+7. HERO MODULE
+================================================================================
+Base URL: /hero
+Base Server URL: http://localhost:<PORT>/hero (or your production domain)
+
+--------------------------------------------------------------------------------
+7.1 GET HERO DETAILS
+--------------------------------------------------------------------------------
+Description: Retrieves the portfolio hero header information (greeting, name, roles, description, and avatar/image signed S3 URL). Cached in Redis (24-hour TTL).
+Access: Public
+
+[REQUEST]
+• Method: GET
+• Endpoint: /hero
+• Headers:
+    Accept: application/json
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "data": {
+        "_id": "664f1c9d2f8a1a001e3b4c01",
+        "greeting": "Hello, I am",
+        "name": "Pratik Rathod",
+        "roles": ["Full Stack Developer", "Backend Engineer", "Cloud Architect"],
+        "description": "I build scalable high-performance web applications and distributed backend architectures.",
+        "image": "https://s3.amazonaws.com/your-bucket/Hero/avatar.jpg?X-Amz-Signature=...",
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-02-01T00:00:00.000Z",
+        "__v": 0
+      },
+      "source": "cache" // or "database"
+    }
+
+• 404 Not Found:
+    {
+      "message": "Hero not found"
+    }
+
+• 500 Internal Server Error:
+    {
+      "message": "Internal server error"
+    }
+
+--------------------------------------------------------------------------------
+7.2 UPDATE HERO DETAILS
+--------------------------------------------------------------------------------
+Description: Updates Hero details and/or replaces the avatar image. Queues update job to BullMQ worker and invalidates Redis cache.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /hero
+• Headers:
+    Content-Type: multipart/form-data (or application/json)
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Form Data / Body (All fields optional):
+    greeting: "Hello, I'm"
+    name: "Pratik Rathod"
+    roles: ["Full Stack Developer", "System Architect"]
+    description: "Experienced engineer passionate about robust backend services."
+    file: <optional_new_avatar_image>
+
+[RESPONSES]
+• 202 Accepted (Success - Queued):
+    {
+      "message": "Hero section was added to the update queue and is being processed.",
+      "jobId": "hero-job-id"
+    }
+
+• 400 Bad Request / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+HERO MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services/hooks for the Hero section:
+1. Public View: Call `GET /hero` on page load to display the dynamic greeting, name, typewriter role animation (`data.roles`), description, and avatar image (`data.image`).
+2. Admin Edit: Call `PUT /hero` with `FormData` and `withCredentials: true` to update hero intro text and upload new avatar. Refetch hero query upon 202 Accepted."
+
+
+================================================================================
+8. LOGGER MODULE
+================================================================================
+Base URL: /logger
+Base Server URL: http://localhost:<PORT>/logger (or your production domain)
+
+--------------------------------------------------------------------------------
+8.1 GET SYSTEM LOGS (FILTERABLE & PAGINATED)
+--------------------------------------------------------------------------------
+Description: Retrieves application log events with level & context filtering and pagination. Cached in Redis (5-minute TTL).
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: GET
+• Endpoint: /logger?page=1&limit=20&level=error&context=AuthController
+• Headers:
+    Accept: application/json
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Query Parameters:
+    page: 1 (number, optional, default: 1)
+    limit: 20 (number, optional, default: 10, max: 100)
+    level: "info" | "warn" | "error" | "debug" | "http" (optional)
+    context: "AuthController" | "BlogController" | ... (string, optional)
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "data": {
+        "logs": [
+          {
+            "_id": "664f1c9d2f8a1a001e3b4c88",
+            "level": "error",
+            "message": "Update About error",
+            "context": "AboutController",
+            "metadata": { "error": "Database timeout" },
+            "stack": "Error: Database timeout\n    at ...",
+            "createdAt": "2026-03-01T14:20:00.000Z",
+            "updatedAt": "2026-03-01T14:20:00.000Z"
+          }
+        ],
+        "total": 45,
+        "page": 1,
+        "limit": 20,
+        "totalPages": 3
+      },
+      "source": "cache" // or "database"
+    }
+
+• 403 Forbidden / 401 Unauthorized / 500 Internal Server Error
+
+--------------------------------------------------------------------------------
+8.2 GET LOG BY ID
+--------------------------------------------------------------------------------
+Description: Retrieves a single log entry by its MongoDB ID. Cached in Redis.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: GET
+• Endpoint: /logger/:id
+• Path Parameters:
+    id: "664f1c9d2f8a1a001e3b4c88"
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "data": { ... },
+      "source": "cache"
+    }
+
+• 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+8.3 CREATE LOG (CLIENT/SYSTEM INGESTION)
+--------------------------------------------------------------------------------
+Description: Ingests an application log event. Queued to BullMQ worker for non-blocking persistence.
+Access: Public / Internal
+
+[REQUEST]
+• Method: POST
+• Endpoint: /logger
+• Headers:
+    Content-Type: application/json
+• Body (JSON):
+    {
+      "level": "error", // "info" | "warn" | "error" | "debug" | "http"
+      "message": "Failed to load dynamic chart widget",
+      "context": "FrontendAnalytics",
+      "metadata": { "browser": "Chrome", "os": "Windows" },
+      "stack": "Error at Chart.render (App.tsx:45)"
+    }
+
+[RESPONSES]
+• 202 Accepted (Success):
+    {
+      "message": "Log queued successfully",
+      "jobId": "log-job-id"
+    }
+
+• 400 Bad Request / 500 Internal Server Error
+
+--------------------------------------------------------------------------------
+8.4 DELETE LOG BY ID
+--------------------------------------------------------------------------------
+Description: Deletes a specific log record and invalidates logger cache versions.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: DELETE
+• Endpoint: /logger/:id
+
+[RESPONSES]
+• 200 OK (`{ "message": "Log deleted successfully" }`) / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+8.5 CLEAR ALL LOGS
+--------------------------------------------------------------------------------
+Description: Purges all logs from the database and invalidates the list cache.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: DELETE
+• Endpoint: /logger/all
+
+[RESPONSES]
+• 200 OK (`{ "message": "All logs cleared successfully" }`) / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+LOGGER MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services for Admin Log Viewer:
+1. Log Viewer Table: Query `GET /logger?page=${page}&limit=${limit}&level=${level}&context=${context}` with `withCredentials: true`. Display severity badges (Info/Warn/Error/Debug), timestamp, context, message, and expandable stack traces.
+2. Log Actions: Inspect log by ID (`GET /logger/${id}`), delete individual log (`DELETE /logger/${id}`), and purge all logs (`DELETE /logger/all`).
+3. Frontend Error Boundary Reporter: Post uncaught client-side UI exceptions to `POST /logger`."
+
+
+================================================================================
+9. NOTE MODULE
+================================================================================
+Base URL: /note
+Base Server URL: http://localhost:<PORT>/note (or your production domain)
+
+--------------------------------------------------------------------------------
+9.1 CREATE NOTE (DOCUMENT / CHEATSHEET / PDF)
+--------------------------------------------------------------------------------
+Description: Uploads note thumbnail image and PDF document to S3, validates fields, and queues note creation in BullMQ.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: POST
+• Endpoint: /note/createNote
+• Headers:
+    Content-Type: multipart/form-data
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Form Data (multipart/form-data):
+    title: "System Design Hand-written Cheatsheet" (string, required)
+    description: "Comprehensive notes on distributed caching, CAP theorem, and event-driven architecture." (string, required)
+    image: <image_file> (Thumbnail image file: JPEG/PNG/WEBP, required)
+    pdf: <pdf_file> (PDF document file: PDF, required)
+
+[RESPONSES]
+• 202 Accepted (Success - Queued):
+    {
+      "success": true,
+      "message": "Note was added to the queue and is being processed.",
+      "jobId": "note-job-id"
+    }
+
+• 400 Bad Request / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+9.2 GET ALL NOTES
+--------------------------------------------------------------------------------
+Description: Retrieves a paginated list of non-deleted notes with signed S3 URLs for both thumbnail and PDF document. Cached in Redis.
+Access: Public (Tracks view analytics via updateAdminViews middleware)
+
+[REQUEST]
+• Method: GET
+• Endpoint: /note/getnotes?page=1&limit=10
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "data": [
+        {
+          "_id": "664f1c9d2f8a1a001e3b4c90",
+          "title": "System Design Hand-written Cheatsheet",
+          "description": "Comprehensive notes on distributed caching, CAP theorem, and event-driven architecture.",
+          "note_image_url": "https://s3.amazonaws.com/your-bucket/Note/Image/cover.jpg?X-Amz-Signature=...",
+          "note_pdf_url": "https://s3.amazonaws.com/your-bucket/Note/PDF/doc.pdf?X-Amz-Signature=...",
+          "isDeleted": false,
+          "createdAt": "2026-02-01T00:00:00.000Z",
+          "updatedAt": "2026-02-01T00:00:00.000Z",
+          "__v": 0
+        }
+      ],
+      "source": "cache" // or "database"
+    }
+
+• 500 Internal Server Error
+
+--------------------------------------------------------------------------------
+9.3 GET NOTE BY ID
+--------------------------------------------------------------------------------
+Description: Retrieves a single note entry with signed S3 URLs for image and PDF.
+Access: Public (Tracks view analytics via updateAdminViews middleware)
+
+[REQUEST]
+• Method: GET
+• Endpoint: /note/getnotes/:_id
+• Path Parameters:
+    _id: "664f1c9d2f8a1a001e3b4c90"
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "data": { ... },
+      "source": "cache" // or "database"
+    }
+
+• 404 Not Found / 500 Server Error
+
+--------------------------------------------------------------------------------
+9.4 UPDATE NOTE
+--------------------------------------------------------------------------------
+Description: Updates note fields and optionally replaces image or PDF files. Queues update in BullMQ.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /note/editNote
+• Headers:
+    Content-Type: multipart/form-data
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Form Data (All fields optional except _id):
+    _id: "664f1c9d2f8a1a001e3b4c90" (required)
+    title: "Updated Note Title"
+    description: "Updated note description"
+    image: <optional_new_thumbnail>
+    pdf: <optional_new_pdf>
+
+[RESPONSES]
+• 202 Accepted (`{ "success": true, "message": "Note update job added successfully", "jobId": "..." }`)
+• 400 Bad Request / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+9.5 DELETE NOTE
+--------------------------------------------------------------------------------
+Description: Soft-deletes note (`isDeleted: true`) and invalidates cache versions.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: DELETE
+• Endpoint: /note/deleteNote/:_id
+• Path Parameters:
+    _id: "664f1c9d2f8a1a001e3b4c90"
+
+[RESPONSES]
+• 200 OK (`{ "success": true, "message": "Note deleted successfully" }`) / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+NOTE MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services for Notes & Cheatsheets:
+1. Public Notes Grid: Call `GET /note/getnotes?page=${page}&limit=${limit}` to render cards with cover thumbnail and 'View/Download PDF' button (`data.note_pdf_url`).
+2. Single Note Viewer: Call `GET /note/getnotes/${id}` to display note overview and embedded PDF reader.
+3. Admin CRUD: Create (`POST /note/createNote`), Edit (`PUT /note/editNote`), and Delete (`DELETE /note/deleteNote/${id}`) using `FormData` and `withCredentials: true`."
+
+
+================================================================================
+10. NOTIFICATION MODULE
+================================================================================
+Base URL: /notifications
+Base Server URL: http://localhost:<PORT>/notifications (or your production domain)
+
+--------------------------------------------------------------------------------
+10.1 GET ALL NOTIFICATIONS (FILTERABLE & PAGINATED)
+--------------------------------------------------------------------------------
+Description: Retrieves system notifications with total and unread counts. Supports filtering by type and unread status. Cached in Redis.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: GET
+• Endpoint: /notifications?page=1&limit=10&unreadOnly=true&type=info
+• Headers:
+    Accept: application/json
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Query Parameters:
+    page: 1 (number, optional, default: 1)
+    limit: 10 (number, optional, default: 10, max: 100)
+    type: "info" | "warning" | "danger" (optional)
+    unreadOnly: "true" | "false" (optional)
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "data": {
+        "notifications": [
+          {
+            "_id": "664f1c9d2f8a1a001e3b4d55",
+            "type": "info",
+            "title": "Blog Created",
+            "message": "Blog \"System Design\" was created successfully.",
+            "isRead": false,
+            "userId": null,
+            "data": null,
+            "isDeleted": false,
+            "createdAt": "2026-03-01T10:00:00.000Z",
+            "updatedAt": "2026-03-01T10:00:00.000Z",
+            "__v": 0
+          }
+        ],
+        "total": 12,
+        "unreadCount": 3,
+        "page": 1,
+        "limit": 10,
+        "totalPages": 2
+      },
+      "source": "cache" // or "database"
+    }
+
+• 403 Forbidden / 401 Unauthorized / 500 Internal Server Error
+
+--------------------------------------------------------------------------------
+10.2 GET NOTIFICATION BY ID
+--------------------------------------------------------------------------------
+Description: Retrieves a single notification by its MongoDB ID. Cached in Redis.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: GET
+• Endpoint: /notifications/:id
+• Path Parameters:
+    id: "664f1c9d2f8a1a001e3b4d55"
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "data": { ... },
+      "source": "database"
+    }
+
+• 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+10.3 MARK NOTIFICATION AS READ
+--------------------------------------------------------------------------------
+Description: Marks a specific notification as read (`isRead: true`) and invalidates cache versions.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /notifications/:id/read
+• Path Parameters:
+    id: "664f1c9d2f8a1a001e3b4d55"
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "message": "Notification marked as read",
+      "data": {
+        "_id": "664f1c9d2f8a1a001e3b4d55",
+        "isRead": true,
+        "updatedAt": "2026-03-01T10:05:00.000Z"
+      }
+    }
+
+• 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+10.4 MARK ALL NOTIFICATIONS AS READ
+--------------------------------------------------------------------------------
+Description: Sets `isRead: true` for all unread notifications in bulk and invalidates list cache.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /notifications/read-all
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "message": "All notifications marked as read"
+    }
+
+• 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+10.5 DELETE NOTIFICATION
+--------------------------------------------------------------------------------
+Description: Soft-deletes a notification (`isDeleted: true`) and invalidates cache.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: DELETE
+• Endpoint: /notifications/:id
+• Path Parameters:
+    id: "664f1c9d2f8a1a001e3b4d55"
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "message": "Notification deleted successfully"
+    }
+
+• 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+10.6 CLEAR ALL NOTIFICATIONS
+--------------------------------------------------------------------------------
+Description: Soft-deletes all notifications in bulk (`isDeleted: true`).
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: DELETE
+• Endpoint: /notifications/all
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "message": "All notifications cleared successfully"
+    }
+
+• 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+NOTIFICATION MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services for Admin Notification Bell & Drawer:
+1. Notification Bell & Badge: Poll or query `GET /notifications?limit=5` with `withCredentials: true` to display the active unread notification counter badge (`data.unreadCount`).
+2. Notification Drawer: Render items categorized by type (Info / Warning / Danger) with timestamp and read indicator dot.
+3. User Actions:
+   - Mark as Read: On click, call `PUT /notifications/${id}/read` to clear indicator dot and decrement counter.
+   - Mark All Read: Click 'Mark all as read' button to call `PUT /notifications/read-all`.
+   - Delete / Clear: Call `DELETE /notifications/${id}` or `DELETE /notifications/all`."
+
+
+
+
+================================================================================
+11. PROJECT MODULE
+================================================================================
+Base URL: /project
+Base Server URL: http://localhost:<PORT>/project (or your production domain)
+
+--------------------------------------------------------------------------------
+11.1 CREATE PROJECT
+--------------------------------------------------------------------------------
+Description: Uploads project thumbnail to S3, validates fields, and queues project creation to BullMQ.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: POST
+• Endpoint: /project
+• Headers:
+    Content-Type: multipart/form-data
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Form Data:
+    title: "Antigravity Cloud IDE" (string, required)
+    subtitle: "Full-Stack Collaborative Development Environment" (string, required)
+    description: "Architected real-time WebSocket collaboration engine, microservices backend, and Next.js frontend." (string, required)
+    difficult: "Advanced" (string, required)
+    file: <image_file> (Image binary, required)
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "message": "Project created successfully",
+      "jobId": "project-job-id"
+    }
+
+• 400 Bad Request / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+11.2 GET ALL PROJECTS
+--------------------------------------------------------------------------------
+Description: Retrieves all projects with signed S3 thumbnail URLs.
+Access: Public (Tracks view analytics via updateAdminViews middleware)
+
+[REQUEST]
+• Method: GET
+• Endpoint: /project?page=1&limit=10
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "data": [
+        {
+          "_id": "664f1c9d2f8a1a001e3b4ca0",
+          "title": "Antigravity Cloud IDE",
+          "subtitle": "Full-Stack Collaborative Development Environment",
+          "description": "Architected real-time WebSocket collaboration engine, microservices backend, and Next.js frontend.",
+          "difficult": "Advanced",
+          "image": "https://s3.amazonaws.com/your-bucket/Project/thumb.png?X-Amz-Signature=...",
+          "createdAt": "2026-01-10T00:00:00.000Z",
+          "updatedAt": "2026-01-10T00:00:00.000Z",
+          "__v": 0
+        }
+      ]
+    }
+
+• 404 Not Found / 500 Server Error
+
+--------------------------------------------------------------------------------
+11.3 GET PROJECT BY ID
+--------------------------------------------------------------------------------
+Description: Retrieves single project details with signed S3 thumbnail URL.
+Access: Public (Tracks view analytics via updateAdminViews middleware)
+
+[REQUEST]
+• Method: GET
+• Endpoint: /project/:_id
+• Path Parameters:
+    _id: "664f1c9d2f8a1a001e3b4ca0"
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "data": { ... }
+    }
+
+• 404 Not Found / 500 Server Error
+
+--------------------------------------------------------------------------------
+11.4 UPDATE PROJECT
+--------------------------------------------------------------------------------
+Description: Updates project fields and/or uploads a replacement thumbnail image. Queues update in BullMQ.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /project/:_id
+• Path Parameters:
+    _id: "664f1c9d2f8a1a001e3b4ca0"
+• Form Data / Body (All fields optional except _id):
+    _id: "664f1c9d2f8a1a001e3b4ca0"
+    title: "Updated Title"
+    subtitle: "Updated Subtitle"
+    description: "Updated Description"
+    difficult: "Intermediate"
+    file: <optional_new_image>
+
+[RESPONSES]
+• 202 Accepted (`{ "success": true, "message": "Project update job added successfully", "jobId": "..." }`)
+• 400 Bad Request / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+11.5 DELETE PROJECT
+--------------------------------------------------------------------------------
+Description: Permanently deletes project from database and invalidates project cache.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: DELETE
+• Endpoint: /project/:_id
+• Path Parameters:
+    _id: "664f1c9d2f8a1a001e3b4ca0"
+
+[RESPONSES]
+• 200 OK (`{ "success": true, "message": "Project Deleted successfully" }`)
+• 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+PROJECT MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services for Projects:
+1. Public Portfolio Showcase: Call `GET /project?page=${page}&limit=${limit}` to render project cards with title, subtitle, difficulty badge, image, and description.
+2. Single Project View: Call `GET /project/${id}` for project detail modal/page.
+3. Admin Project Management: Create (`POST /project`), Update (`PUT /project/${id}`), and Delete (`DELETE /project/${id}`) with `withCredentials: true`."
+
+
+================================================================================
+12. RESUME (CV) MODULE
+================================================================================
+Base URL: /CV
+Base Server URL: http://localhost:<PORT>/CV (or your production domain)
+
+--------------------------------------------------------------------------------
+12.1 GET RESUME / CV
+--------------------------------------------------------------------------------
+Description: Retrieves the active CV / Resume PDF signed S3 URL.
+Access: Public (Tracks view analytics via updateAdminViews middleware)
+
+[REQUEST]
+• Method: GET
+• Endpoint: /CV
+• Headers:
+    Accept: application/json
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "success": true,
+      "data": "https://s3.amazonaws.com/your-bucket/Resume/Pratik_Rathod_Resume.pdf?X-Amz-Signature=..."
+    }
+
+• 404 Not Found:
+    {
+      "success": false,
+      "message": "CV not found"
+    }
+
+• 500 Internal Server Error:
+    {
+      "success": false,
+      "message": "Something went wrong"
+    }
+
+--------------------------------------------------------------------------------
+12.2 UPLOAD / CREATE CV
+--------------------------------------------------------------------------------
+Description: Uploads initial Resume PDF to S3 and queues creation in BullMQ.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: POST
+• Endpoint: /CV
+• Headers:
+    Content-Type: multipart/form-data
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Form Data:
+    file: <pdf_file> (PDF binary, required)
+
+[RESPONSES]
+• 202 Accepted (Success - Queued):
+    {
+      "success": true,
+      "message": "CV creation job added successfully",
+      "jobId": "cv-job-id"
+    }
+
+• 400 Bad Request (`{ "success": false, "message": "CV file is required" }`)
+• 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+12.3 UPDATE CV
+--------------------------------------------------------------------------------
+Description: Replaces existing Resume PDF with a new uploaded file in S3 and queues update.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /CV
+• Headers:
+    Content-Type: multipart/form-data
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Form Data:
+    _id: "664f1c9d2f8a1a001e3b4cb0" (CV MongoDB ID, required)
+    file: <new_pdf_file> (PDF binary, required)
+
+[RESPONSES]
+• 202 Accepted (`{ "success": true, "message": "CV update job added successfully", "jobId": "..." }`)
+• 400 Bad Request / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+RESUME MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services for Resume/CV:
+1. Public Resume Download/View: Call `GET /CV` and bind the signed URL (`data`) to the 'Download CV' and 'View CV' buttons.
+2. Admin Upload/Replace: Use `FormData` with `file` (and `_id` on PUT) to upload/update resume PDF via `POST /CV` or `PUT /CV` with `withCredentials: true`."
+
+
+================================================================================
+13. SKILL MODULE
+================================================================================
+Base URL: /skills
+Base Server URL: http://localhost:<PORT>/skills (or your production domain)
+
+--------------------------------------------------------------------------------
+13.1 CREATE SKILL
+--------------------------------------------------------------------------------
+Description: Validates skill parameters and queues skill creation job in BullMQ.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: POST
+• Endpoint: /skills
+• Headers:
+    Content-Type: application/json
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Body (JSON):
+    {
+      "language": "TypeScript",
+      "color": "#3178C6",
+      "percentage": 95
+    }
+
+[VALIDATION RULES]
+• language: Required string, min 1 character.
+• color: Required hex/color string, min 1 character.
+• percentage: Required number between 0 and 100.
+
+[RESPONSES]
+• 202 Accepted (Success - Queued):
+    {
+      "success": true,
+      "message": "Skill creation job added successfully",
+      "jobId": "skill-job-id"
+    }
+
+• 400 Bad Request / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+13.2 GET ALL SKILLS
+--------------------------------------------------------------------------------
+Description: Retrieves all skills. Cached in Redis.
+Access: Public (Tracks view analytics via updateAdminViews middleware)
+
+[REQUEST]
+• Method: GET
+• Endpoint: /skills?page=1&limit=20
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "data": [
+        {
+          "_id": "664f1c9d2f8a1a001e3b4cc0",
+          "language": "TypeScript",
+          "color": "#3178C6",
+          "percentage": 95,
+          "isDeleted": false,
+          "createdAt": "2026-01-01T00:00:00.000Z",
+          "updatedAt": "2026-01-01T00:00:00.000Z",
+          "__v": 0
+        }
+      ],
+      "source": "cache" // or "database"
+    }
+
+• 500 Internal Server Error
+
+--------------------------------------------------------------------------------
+13.3 UPDATE SKILL
+--------------------------------------------------------------------------------
+Description: Updates skill language, color, or percentage. Queues update in BullMQ.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /skills
+• Headers:
+    Content-Type: application/json
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+• Body (JSON):
+    {
+      "_id": "664f1c9d2f8a1a001e3b4cc0",
+      "language": "TypeScript / JavaScript",
+      "color": "#3178C6",
+      "percentage": 98
+    }
+
+[RESPONSES]
+• 202 Accepted (`{ "success": true, "message": "Skill update job added successfully", "jobId": "..." }`)
+• 400 Bad Request / 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+13.4 DELETE SKILL
+--------------------------------------------------------------------------------
+Description: Soft-deletes skill (`isDeleted: true`) and invalidates cache versions.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: DELETE
+• Endpoint: /skills/:_id
+• Path Parameters:
+    _id: "664f1c9d2f8a1a001e3b4cc0"
+
+[RESPONSES]
+• 200 OK (`{ "success": true, "message": "Skill deleted successfully" }`)
+• 404 Not Found / 403 / 401 Auth Errors / 500 Server Error
+
+--------------------------------------------------------------------------------
+SKILL MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services for Skills progress bars/badges:
+1. Public Display: Call `GET /skills` to render animated progress bars or skill badges using `item.language`, `item.color`, and `item.percentage`.
+2. Admin Management: Create (`POST /skills`), Edit (`PUT /skills`), and Delete (`DELETE /skills/${id}`) with `withCredentials: true`."
+
+
+================================================================================
+14. STATES / STATS MODULE
+================================================================================
+Base URL: /states
+Base Server URL: http://localhost:<PORT>/states (or your production domain)
+
+--------------------------------------------------------------------------------
+14.1 FETCH DASHBOARD STATS & METRICS
+--------------------------------------------------------------------------------
+Description: Fetches total counts for all entities (Blogs, Projects, Notes, Contact Messages, Skills) and total portfolio visitor views.
+Access: Protected (Requires Admin Cookie: 'admin')
+
+[REQUEST]
+• Method: GET
+• Endpoint: /states
+• Headers:
+    Accept: application/json
+• Cookies / Credentials:
+    admin=<jwt_token> (credentials: "include" / withCredentials: true)
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "BlogLength": 12,
+      "ProjectLength": 8,
+      "NoteLength": 15,
+      "ContactLength": 34,
+      "SkillLength": 18,
+      "AdminView": 1420
+    }
+
+• 403 Forbidden / 401 Unauthorized / 500 Internal Server Error
+
+--------------------------------------------------------------------------------
+14.2 INCREMENT PORTFOLIO VIEW COUNT
+--------------------------------------------------------------------------------
+Description: Increments portfolio total view counter by 1.
+Access: Public
+
+[REQUEST]
+• Method: PUT
+• Endpoint: /states/view
+• Headers:
+    Accept: application/json
+
+[RESPONSES]
+• 200 OK (Success):
+    {
+      "message": "View incremented successfully",
+      "view": 1421
+    }
+
+• 500 Internal Server Error:
+    {
+      "message": "Unable to update view"
+    }
+
+--------------------------------------------------------------------------------
+STATS MODULE - FRONTEND INTEGRATION PROMPT
+--------------------------------------------------------------------------------
+"Implement frontend services for Dashboard Stats & Analytics:
+1. View Incrementer: On visitor landing, trigger `PUT /states/view` once per session to track page visits.
+2. Admin Dashboard Overview: Call `GET /states` with `withCredentials: true` to display KPI overview metric cards (Total Views, Total Blogs, Projects, Notes, Inquiries, Skills)."
