@@ -229,7 +229,7 @@ const CreateSkill = () => {
       onSubmit={formik.handleSubmit}
       className="p-4 sm:p-6 space-y-6"
     >
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex justify-between gap-4">
         <h2 className="text-xl font-semibold text-white">
           {isEditMode ? "Edit Skill" : "Create Skill"}
         </h2>
@@ -241,19 +241,6 @@ const CreateSkill = () => {
             varient="secondary"
             onClick={() => router.push("/Dashboard/Skills")}
           />
-
-          {isEditMode && (
-            <Button
-              type="button"
-              text="Delete"
-              ProcessText="Deleting..."
-              Icon={FiTrash2}
-              varient="danger"
-              isSubmitting={isDeleting}
-              isDisabled={formik.isSubmitting}
-              onClick={handleDeleteSkill}
-            />
-          )}
         </div>
       </div>
 
@@ -299,7 +286,7 @@ const CreateSkill = () => {
         />
       </div>
 
-      <div className="w-full md:w-1/2">
+      <div className="">
         <label className="block mb-2 text-sm font-medium text-gray-300">
           Color
         </label>
@@ -311,16 +298,16 @@ const CreateSkill = () => {
             onChange={(event) =>
               formik.setFieldValue("color", event.target.value)
             }
-            className="h-10 w-10 cursor-pointer rounded border border-gray-500"
+            className="h-10 w-10 shrink-0 cursor-pointer rounded border border-gray-500"
             title="Choose color"
           />
 
           <Input
             type="text"
-            name="color"
             placeholder="#3b82f6"
             value={formik.values.color}
             inputType="input"
+            style="flex-1"
             onChange={(value) => {
               if (
                 value === "" ||

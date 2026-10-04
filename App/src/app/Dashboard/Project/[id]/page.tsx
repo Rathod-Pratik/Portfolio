@@ -1,3 +1,3 @@
-import ProjectEditor from './index';
+import ProjectEditor from "./index";
 
 export default ProjectEditor;

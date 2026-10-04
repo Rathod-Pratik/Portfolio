@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@apiClient";
 import { DELETE_NOTES, GET_NOTES } from "@api";
 import { toast } from "react-toastify";
@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { Button, Input, Loading } from "@components";
 import type { GetNotesResponse, NoteItem } from "@Type";
 import type { AxiosError } from "axios";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 const Notes = () => {
     const router = useRouter();
@@ -17,15 +18,30 @@ const Notes = () => {
 
     const [searchTerm, setSearchTerm] = useState("");
 
-    const { data: Note = [], isLoading: loading } = useQuery<NoteItem[]>({
+    const {
+        data,
+        isLoading: loading,
+        isFetchingNextPage,
+        fetchNextPage,
+        hasNextPage = false,
+    } = useInfiniteQuery<NoteItem[]>({
         queryKey: ["notes"],
-        queryFn: async () => {
-            const response = await apiClient.get<GetNotesResponse>(`${GET_NOTES}?page=1&limit=100`, {
+        initialPageParam: 1,
+        queryFn: async ({ pageParam }) => {
+            const response = await apiClient.get<GetNotesResponse>(`${GET_NOTES}?page=${pageParam}&limit=20`, {
                 withCredentials: true,
             });
             const payload = response.data.data;
             return Array.isArray(payload) ? payload : payload.notes;
         },
+        getNextPageParam: (lastPage, allPages) =>
+            lastPage.length === 20 ? allPages.length + 1 : undefined,
+    });
+    const Note = data?.pages.flat() ?? [];
+    const loadMoreRef = useInfiniteScroll({
+        hasNextPage,
+        isLoading: isFetchingNextPage,
+        onLoadMore: fetchNextPage,
     });
 
     const DeleteNote = async (_id: string) => {
@@ -59,15 +75,20 @@ const Notes = () => {
     return (
         <div>
             <div className="flex justify-evenly gap-3 py-5">
-                <Input
-                    onChange={(value) => setSearchTerm(value)}
-                    type="text"
-                    placeholder="Search Notes"
-                />
+                <div className="min-w-0 flex-1">
+                    <Input
+                        onChange={(value) => setSearchTerm(value)}
+                        type="text"
+                        value={searchTerm}
+                        placeholder="Search Notes"
+                        textColor="text-gray-500"
+                        style="border-2 border-gray-500 bg-white px-4 py-2"
+                    />
+                </div>
                 <Button
-                    onClick={() => router.push('/Dashboard/Notes/create')}
                     text="New"
-                    varient="primary"
+                    onClick={() => router.push('/Dashboard/Notes/create')}
+                    varient="secondary"
                     title="New Note"
                 />
             </div>
@@ -82,7 +103,7 @@ const Notes = () => {
                         <span className="text-gray-400">No notes found</span>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6 p-4">
+                    <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-6">
                         {FilterData.map((item, index) => (
                             <div
                                 key={index}
@@ -121,6 +142,12 @@ const Notes = () => {
                                 </div>
                             </div>
                         ))}
+                        <div ref={loadMoreRef} className="col-span-full h-1" />
+                        {isFetchingNextPage && (
+                            <div className="col-span-full text-center text-gray-400">
+                                Loading more notes...
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

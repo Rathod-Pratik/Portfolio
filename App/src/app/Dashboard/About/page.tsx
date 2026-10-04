@@ -119,7 +119,7 @@ const About = () => {
     }
 
     return (
-        <div className="p-6  mx-auto">
+        <div className="">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-white">About</h2>
                 <button
@@ -127,7 +127,7 @@ const About = () => {
                     disabled={formik.isSubmitting}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium disabled:opacity-50 transition-colors"
                 >
-                    {formik.isSubmitting ? "Saving..." : "Save Changes"}
+                    {formik.isSubmitting ? "Saving..." : "Save"}
                 </button>
             </div>
 
@@ -141,8 +141,9 @@ const About = () => {
                     onBlur={() => formik.setFieldTouched('content', true)}
                     inputType='textarea'
                     placeholder="Please Enter Content"
+                    className="w-full h-screen bg-gray-700 text-white border border-gray-600 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <div className="mt-4 text-sm text-gray-400 flex justify-between">
+                <div className="mt-2 text-sm text-gray-400 flex justify-between">
                     <span>You can use markdown formatting: **bold**, *italic*, [links](url), etc.</span>
                     <span>{formik.values.content.length} characters</span>
                 </div>

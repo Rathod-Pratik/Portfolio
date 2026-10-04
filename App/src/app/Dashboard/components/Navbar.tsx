@@ -21,7 +21,6 @@ const Navbar = () => {
 
   const toggleSidebar = () => {
     window.dispatchEvent(new CustomEvent('admin-sidebar-toggle'));
-    setSidebarOpen((open) => !open);
   };
 
   return (

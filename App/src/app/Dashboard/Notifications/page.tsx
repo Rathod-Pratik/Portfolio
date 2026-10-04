@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import apiClient from '@apiClient';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import {
   CLEAR_NOTIFICATIONS,
   GET_NOTIFICATIONS,
@@ -20,34 +21,38 @@ type Notification = {
 };
 
 const Notifications = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadNotifications = async () => {
-    try {
+  const queryClient = useQueryClient();
+  const {
+    data,
+    isLoading: loading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage = false,
+  } = useInfiniteQuery<{ notifications: Notification[]; totalPages: number }>({
+    queryKey: ['notifications'],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
       const response = await apiClient.get(
-        `${GET_NOTIFICATIONS}?page=1&limit=100`,
+        `${GET_NOTIFICATIONS}?page=${pageParam}&limit=20`,
       );
-      setNotifications(response.data.data.notifications);
-    } catch {
-      toast.error('Unable to load notifications.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadNotifications();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, []);
+      return response.data.data;
+    },
+    getNextPageParam: (lastPage, allPages) =>
+      allPages.length < lastPage.totalPages
+        ? allPages.length + 1
+        : undefined,
+  });
+  const notifications = data?.pages.flatMap((page) => page.notifications) ?? [];
+  const loadMoreRef = useInfiniteScroll({
+    hasNextPage,
+    isLoading: isFetchingNextPage,
+    onLoadMore: fetchNextPage,
+  });
 
   const markAllRead = async () => {
     try {
       await apiClient.put(MARK_ALL_NOTIFICATIONS_READ);
-      await loadNotifications();
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch {
       toast.error('Unable to mark notifications as read.');
     }
@@ -56,7 +61,7 @@ const Notifications = () => {
   const clearAll = async () => {
     try {
       await apiClient.delete(CLEAR_NOTIFICATIONS);
-      setNotifications([]);
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch {
       toast.error('Unable to clear notifications.');
     }
@@ -65,9 +70,7 @@ const Notifications = () => {
   const markRead = async (id: string) => {
     try {
       await apiClient.put(`${MARK_NOTIFICATION_READ}/${id}/read`);
-      setNotifications((items) =>
-        items.map((item) => (item._id === id ? { ...item, isRead: true } : item)),
-      );
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch {
       toast.error('Unable to update notification.');
     }
@@ -109,6 +112,10 @@ const Notifications = () => {
               </div>
             </button>
           ))}
+          <div ref={loadMoreRef} className="h-1" />
+          {isFetchingNextPage && (
+            <p className="text-center text-gray-400">Loading more notifications...</p>
+          )}
         </div>
       )}
     </section>

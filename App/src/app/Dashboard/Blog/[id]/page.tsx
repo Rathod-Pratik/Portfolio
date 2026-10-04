@@ -80,7 +80,7 @@ const validationSchema = yup.object().shape({
 		.mixed<File>()
 		.test("imageRequired", "Cover image is required", function (value) {
 			if (value instanceof File) return true;
-			if (this.parent.coverImage) return true;
+			if (this.parent.image) return true;
 			return false;
 		})
 		.test(
@@ -339,7 +339,7 @@ const CreateBlog = ({ params }: PageProps) => {
 			: undefined;
 
 	return (
-		<form onSubmit={handleFormSubmit} className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto">
+		<form onSubmit={handleFormSubmit} >
 			{/* Top Header */}
 			<div className="flex items-center justify-between gap-3 pb-4 border-b border-gray-700">
 				<div>
@@ -357,16 +357,6 @@ const CreateBlog = ({ params }: PageProps) => {
 						onClick={() => router.push("/Dashboard/Blog")}
 						title="Back to Blogs"
 					/>
-					{isEdit && (
-						<Button
-							varient="danger"
-							text="Delete"
-							onClick={handleDelete}
-							title="Delete Blog"
-							isSubmitting={isDeleting}
-							ProcessText="Deleting..."
-						/>
-					)}
 				</div>
 			</div>
 
@@ -563,13 +553,6 @@ const CreateBlog = ({ params }: PageProps) => {
 
 			{/* Form Footer Action Buttons */}
 			<div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-700">
-				<Button
-					type="button"
-					varient="secondary"
-					text="Cancel"
-					onClick={() => router.push("/Dashboard/Blog")}
-					title="Cancel"
-				/>
 
 				{isEdit && (
 					<Button

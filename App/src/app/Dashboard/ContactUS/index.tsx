@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@apiClient";
 import { DELETE_CONTACT, GET_CONTACT, UPDATE_CONTACT_STATUS } from "@api";
 import { toast } from "react-toastify";
 import { FaTrash } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import type { AxiosError } from "axios";
-import { Loading } from "@components";
+import { Input, Loading } from "@components";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 type ContactUsItem = {
   _id: string;
@@ -43,20 +44,23 @@ const ContactUs = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
   const limit = 10;
 
   const debouncedSearch = useDebounce(searchTerm, 500);
 
   const {
-    data: contacts = [],
+    data,
     isLoading,
     isError,
     error,
-  } = useQuery<ContactUsItem[]>({
-    queryKey: ["contacts", page],
-    queryFn: async () => {
-      const response = await apiClient.get(`${GET_CONTACT}?page=${page}&limit=${limit}`, {
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage = false,
+  } = useInfiniteQuery<ContactUsItem[]>({
+    queryKey: ["contacts"],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const response = await apiClient.get(`${GET_CONTACT}?page=${pageParam}&limit=${limit}`, {
         withCredentials: true,
       });
 
@@ -66,6 +70,14 @@ const ContactUs = () => {
 
       return response.data.data ?? [];
     },
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === limit ? allPages.length + 1 : undefined,
+  });
+  const contacts = data?.pages.flat() ?? [];
+  const loadMoreRef = useInfiniteScroll({
+    hasNextPage,
+    isLoading: isFetchingNextPage,
+    onLoadMore: fetchNextPage,
   });
 
   const updateStatus = async (
@@ -167,22 +179,24 @@ const ContactUs = () => {
 
   return (
     <div>
-      <div className="flex justify-center py-5">
-        <input
+      <div className="min-w-0 flex-1 pb-4">
+        <Input
           type="text"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-[90%] rounded-md border-2 px-4 py-2 text-gray-500 outline-none"
+          onChange={(value) => setSearchTerm(value)}
+          inputType="input"
           placeholder="Search contacts..."
+          textColor="text-gray-500"
+          style="border-2 border-gray-500 bg-white"
         />
-      </div>
+        </div>
 
       {isLoading ? (
         <div className="flex h-[70vh] items-center justify-center">
           <Loading />
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="min-h-[90vh]">
           <table className="min-w-full rounded-lg bg-gray-800 shadow-md">
             <thead>
               <tr className="bg-gray-700 text-white">
@@ -192,7 +206,7 @@ const ContactUs = () => {
                 <th className="px-4 py-2 text-center">Mobile</th>
                 <th className="px-4 py-2 text-center">Project</th>
                 <th className="px-4 py-2 text-center">Budget</th>
-                        <th className="px-4 py-2 text-center">Status</th>
+                <th className="px-4 py-2 text-center">Status</th>
                 <th className="px-4 py-2 text-center">Message</th>
                 <th className="px-4 py-2 text-center">Action</th>
               </tr>
@@ -289,25 +303,17 @@ const ContactUs = () => {
               )}
             </tbody>
           </table>
-          <div className="flex items-center justify-center gap-4 py-5 text-white">
-            <button
-              type="button"
-              disabled={page === 1}
-              onClick={() => setPage((current) => current - 1)}
-              className="rounded bg-gray-700 px-4 py-2 disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span>Page {page}</span>
-            <button
-              type="button"
-              disabled={contacts.length < limit}
-              onClick={() => setPage((current) => current + 1)}
-              className="rounded bg-gray-700 px-4 py-2 disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
+          <div ref={loadMoreRef} className="h-1" />
+          {isFetchingNextPage && (
+            <p className="py-5 text-center text-gray-400">
+              Loading more contacts...
+            </p>
+          )}
+          {!hasNextPage && contacts.length > 0 && (
+            <p className="py-5 text-center text-gray-500">
+              No more contacts.
+            </p>
+          )}
         </div>
       )}
     </div>

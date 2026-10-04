@@ -22,19 +22,12 @@ const Card = ({ item, routerPush }: ProjectCardExtraProps) => {
                     <Image
                         src={item.image || item.images}
                         alt={item.title}
-                        fill
-                        unoptimized
+                        layout="fill"
                         loading="eager"
-                        sizes="(max-width: 768px) 100vw, 100vw"
                         style={{ objectFit: 'cover' }}
                     />
                 </div>
 
-                {item.difficult && (
-                    <span className="mb-2 rounded-full bg-purple-500/20 px-3 py-1 text-xs text-purple-200">
-                        {item.difficult}
-                    </span>
-                )}
 
                 <h5 className="mb-2 text-xl font-medium text-gray-900 dark:text-white text-center">
                     {item.title}
@@ -76,12 +69,6 @@ const Card = ({ item, routerPush }: ProjectCardExtraProps) => {
                         Details
                     </button>
                 </div>
-
-                {item.note && (
-                    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
-                        {item.note}
-                    </div>
-                )}
             </div>
         </div>
     );

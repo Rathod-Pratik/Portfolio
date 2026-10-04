@@ -18,7 +18,9 @@ type InputProps = {
     pdfFile?: File | null;
     pdfName?: string;
     handlePdfChange?: (file: File | null) => void;
-    style?: React.CSSProperties;
+    style?: string;
+    className?: string;
+    textColor?: string;
 };
 
 const Input = ({
@@ -32,10 +34,12 @@ const Input = ({
     inputType = "input",
     onBlur,
     style,
+    textColor,
     handleImageChange,
     imagePreview: initialImagePreview,
     pdfFile,
     pdfName,
+    className,
     handlePdfChange,
 }: InputProps) => {
     const [imagePreview, setImagePreview] = useState<string | null>(
@@ -74,7 +78,7 @@ const Input = ({
                     onChange={(e) => onChange?.(e.target.value)}
                     onBlur={() => onBlur?.(true)}
                     className={`w-full bg-gray-700 border ${error ? "border-red-500" : "border-gray-600"
-                        } rounded-md p-2 text-white focus:outline-none focus:border-purple-500`}
+                        } rounded-md p-2 text-white focus:outline-none focus:border-purple-500 ${className}`}
                     placeholder={placeholder}
                 />
 
@@ -191,7 +195,7 @@ const Input = ({
                 onChange={(e) => onChange?.(e.target.value)}
                 onBlur={() => onBlur?.(true)}
                 className={`w-full bg-gray-700 border ${error ? "border-red-500" : "border-gray-600"
-                    } rounded-md p-2 text-white focus:outline-none focus:border-purple-500 ${style || ""
+                    } rounded-md p-2 ${textColor || "text-white"} focus:outline-none focus:border-purple-500 ${style || ""
                     }`}
             />
 

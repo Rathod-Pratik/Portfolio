@@ -1,19 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { apiClient } from "@apiClient";
 import { DELETE_BLOG, GET_BLOG } from "@api";
 import { toast } from "react-toastify";
 import { Button, Input, Loading } from "@components";
+import { FaEdit, FaTrash } from "react-icons/fa";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 export type BlogType = {
   _id: string;
   title: string;
   slug: string;
   isPublished?: boolean;
-  coverImage?: string;
+  excerpt?: string;
   image?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -24,12 +26,29 @@ const Blogs = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
 
-  const { data: blogs = [], isLoading: loading } = useQuery<BlogType[]>({
+  const {
+    data,
+    isLoading: loading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage = false,
+  } = useInfiniteQuery<BlogType[]>({
     queryKey: ["blogs"],
-    queryFn: async () => {
-      const response = await apiClient.get(`${GET_BLOG}?page=1&limit=100`);
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const response = await apiClient.get(
+        `${GET_BLOG}?page=${pageParam}&limit=20`,
+      );
       return response.data.blog ?? [];
     },
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === 20 ? allPages.length + 1 : undefined,
+  });
+  const blogs = data?.pages.flat() ?? [];
+  const loadMoreRef = useInfiniteScroll({
+    hasNextPage,
+    isLoading: isFetchingNextPage,
+    onLoadMore: fetchNextPage,
   });
 
   const deleteBlog = async (id: string) => {
@@ -64,30 +83,27 @@ const Blogs = () => {
   return (
     <div className="p-5">
       <div className="flex justify-evenly gap-3 py-5">
-        <Input
-          value={search}
-          onChange={(value) => setSearch(value)}
-          onBlur={() => setSearch(search.trim())}
-          type="text"
-          placeholder="Search Blog"
-        />
-        {/* <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className="border-2 text-gray-500 outline-none rounded-md px-4 py-2 w-[90%]"
-          type="text"
-          placeholder="Search Blog"
-        /> */}
-        <button
-          onClick={() => router.push("/Dashboard/Blog/create")}
-          className="text-white bg-blue-500 px-5 cursor-pointer py-2 rounded-md"
-        >
-          New
-        </button>
-      </div>
+        <div className="min-w-0 flex-1">
+          <Input
+            value={search}
+            onChange={(value) => setSearch(value)}
+            type="text"
+            placeholder="Search Blog"
+            textColor="text-gray-500"
+            style="border-2 border-gray-500 bg-white px-4 py-2"
+          />
+          </div>
+          <Button
+            text="New"
+            onClick={() => router.push("/Dashboard/Blog/create")}
+            varient="secondary"
+            title="New Note"
+          />
 
+        
+      </div>
       {loading ? (
-        <div className="flex justify-center items-center h-[70vh]">
+        <div className="flex justify-center items-center h-[80vh]">
           <Loading />
         </div>
       ) : (
@@ -99,10 +115,10 @@ const Blogs = () => {
               className="group relative overflow-hidden rounded-2xl bg-linear-to-br from-gray-900 to-gray-800 border border-gray-700/50 shadow-lg hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 hover:-translate-y-2 flex flex-col"
             >
               {/* Image Section */}
-              {blog.coverImage && (
+              {blog.image && (
                 <div className="relative overflow-hidden">
                   <img
-                    src={blog.image ?? blog.coverImage}
+                    src={blog.image}
                     alt={blog.title}
                     className="h-56 w-full object-cover transition-transform duration-700 group-hover:scale-110"
                   />
@@ -110,12 +126,6 @@ const Blogs = () => {
                   {/* Dark Overlay */}
                   <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent"></div>
 
-                  {/* Top Badge */}
-                  <div className="absolute top-3 left-3">
-                    <span className="bg-purple-600/90 backdrop-blur-md text-white text-xs font-semibold px-3 py-1 rounded-full shadow-md">
-                      Blog
-                    </span>
-                  </div>
                 </div>
               )}
 
@@ -126,8 +136,8 @@ const Blogs = () => {
                 </h2>
 
                 <p className="text-gray-400 text-sm leading-6 grow line-clamp-3">
-                  {blog.slug?.split(" ").slice(0, 20).join(" ") ??
-                    "No slug available"}
+                  {blog.excerpt?.split(" ").slice(0, 20).join(" ") ??
+                    "No excerpt available"}
                   ...
                 </p>
 
@@ -138,13 +148,15 @@ const Blogs = () => {
                     <Button
                       onClick={() => router.push(`/Dashboard/Blog/${blog._id}`)}
                       text="Edit"
-                      varient="primary"
+                      Icon={FaEdit}
+                      varient="secondary"
                       title="Edit Blog"
                     />
 
                     <Button
                       onClick={() => deleteBlog(blog._id)}
                       text="Delete"
+                      Icon={FaTrash}
                       varient="danger"
                       title="Delete Blog"
                     />
@@ -158,6 +170,12 @@ const Blogs = () => {
               </div>
             </div>
           ))}
+          <div ref={loadMoreRef} className="col-span-full h-1" />
+          {isFetchingNextPage && (
+            <div className="col-span-full text-center text-gray-400">
+              Loading more blogs...
+            </div>
+          )}
         </div>
       )}
     </div>

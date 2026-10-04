@@ -10,8 +10,8 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
       <AdminNavbar />
       <AuthGuard />
 
-      <main className="min-h-screen pt-18 xl:ml-64">
-        <div className="p-4 pt-6 sm:p-6 sm:pt-6 lg:p-8">
+      <main className="flex min-h-screen flex-col justify-center pt-6 xl:ml-62.5">
+        <div className="p-4 sm:p-6 lg:p-8">
           {children}
         </div>
       </main>

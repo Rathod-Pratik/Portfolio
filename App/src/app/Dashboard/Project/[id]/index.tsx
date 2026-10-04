@@ -17,62 +17,46 @@ import apiClient from "@apiClient";
 import { Input, Button, Loading } from "@components";
 import type { AxiosError } from "axios";
 
-type ProjectDifficulty = "Easy" | "Medium" | "Hard" | "Intermediate" | "Advanced";
+type ProjectDifficulty = "Easy" | "Medium" | "Hard";
 
 type ProjectItem = {
   _id: string;
   title: string;
-  subtitle?: string;
-  description: string;
+  description?: string;
+  content: string;
   images: string;
   image?: string;
   difficult?: ProjectDifficulty;
-  liveDemoLink?: string;
-  techStack?: string[];
-  features?: string[];
-  note?: string;
+
 };
 
 type Params = {
-  _id?: string;
+  id?: string;
 };
 
 type ProjectFormValues = {
   title: string;
-  subtitle: string;
   description: string;
-  liveDemoLink: string;
+  content: string;
   difficult: "" | ProjectDifficulty;
-  techStack: string[];
-  features: string[];
   imageFile: File | null;
   images: string;
 };
 
 const getInitialValues = (): ProjectFormValues => ({
   title: "",
-  subtitle: "",
   description: "",
-  liveDemoLink: "",
+  content: "",
   difficult: "",
-  techStack: [""],
-  features: [""],
   imageFile: null,
   images: "",
 });
 
 const toFormValues = (project: ProjectItem): ProjectFormValues => ({
   title: project.title,
-  subtitle: project.subtitle ?? "",
-  description: project.description,
-  liveDemoLink: project.liveDemoLink ?? "",
+  description: project.description ?? "",
+  content: project.content ?? "",
   difficult: project.difficult ?? "",
-  techStack: project.techStack?.length
-    ? project.techStack
-    : [""],
-  features: project.features?.length
-    ? project.features
-    : [""],
   imageFile: null,
   images: project.image || project.images,
 });
@@ -80,7 +64,7 @@ const toFormValues = (project: ProjectItem): ProjectFormValues => ({
 const CreateProject = () => {
   const router = useRouter();
   const params = useParams<Params>();
-  const _id = params?._id;
+  const _id = params?.id;
 
   const [deleting, setDeleting] = useState(false);
 
@@ -128,20 +112,21 @@ const CreateProject = () => {
           .min(1, "Title is required")
           .required("Title is required"),
 
-        subtitle: yup
-          .string()
-          .trim()
-          .min(1, "Subtitle is required")
-          .required("Subtitle is required"),
-
         description: yup
           .string()
           .trim()
           .min(1, "Description is required")
           .required("Description is required"),
 
+        content: yup
+          .string()
+          .trim()
+          .min(1, "Content is required")
+          .required("Content is required"),
+
         difficult: yup
           .mixed<ProjectDifficulty>()
+          .oneOf(["Easy", "Medium", "Hard"])
           .required("Difficulty is required"),
 
         imageFile: yup
@@ -207,10 +192,10 @@ const CreateProject = () => {
         }
 
         payload.append("title", values.title.trim());
-        payload.append("subtitle", values.subtitle.trim());
+        payload.append("description", values.description.trim());
         payload.append(
-          "description",
-          values.description.trim(),
+          "content",
+          values.content.trim(),
         );
 
         payload.append("difficult", values.difficult);
@@ -284,40 +269,6 @@ const CreateProject = () => {
     };
   }, [formik.values.imageFile]);
 
-  const updateFeature = (
-    index: number,
-    value: string,
-  ) => {
-    const features = [...formik.values.features];
-    features[index] = value;
-
-    formik.setFieldValue("features", features);
-  };
-
-  const updateTechStack = (
-    index: number,
-    value: string,
-  ) => {
-    const techStack = [...formik.values.techStack];
-    techStack[index] = value;
-
-    formik.setFieldValue("techStack", techStack);
-  };
-
-  const addFeature = () => {
-    formik.setFieldValue("features", [
-      ...formik.values.features,
-      "",
-    ]);
-  };
-
-  const addTechStack = () => {
-    formik.setFieldValue("techStack", [
-      ...formik.values.techStack,
-      "",
-    ]);
-  };
-
   const handleDelete = async () => {
     if (!_id) {
       return;
@@ -372,6 +323,8 @@ const CreateProject = () => {
       </div>
     );
   }
+
+
 
   return (
     <form
@@ -455,102 +408,53 @@ const CreateProject = () => {
           }
         />
 
-        <Input
-          type="text"
-          name="subtitle"
-          lable="Subtitle"
-          placeholder="Brief project subtitle"
-          value={formik.values.subtitle}
-          onChange={(value) =>
-            formik.setFieldValue("subtitle", value)
-          }
-          onBlur={() =>
-            formik.setFieldTouched(
-              "subtitle",
-              true,
-            )
-          }
-          error={
-            formik.touched.subtitle
-              ? formik.errors.subtitle
-              : undefined
-          }
-        />
+        <div >
+          <label className="mb-2 block text-sm font-medium text-gray-300">
+            Difficulty Level
+          </label>
 
-        <Input
-          type="url"
-          name="liveDemoLink"
-          lable="Live Demo URL"
-          placeholder="https://example.com"
-          value={formik.values.liveDemoLink}
-          onChange={(value) =>
-            formik.setFieldValue(
-              "liveDemoLink",
-              value,
-            )
-          }
-          onBlur={() =>
-            formik.setFieldTouched(
-              "liveDemoLink",
-              true,
-            )
-          }
-          error={
-            formik.touched.liveDemoLink
-              ? formik.errors.liveDemoLink
-              : undefined
-          }
-        />
+          <select
+            name="difficult"
+            value={formik.values.difficult}
+            onChange={(event) =>
+              formik.setFieldValue(
+                "difficult",
+                event.target.value,
+              )
+            }
+            onBlur={() =>
+              formik.setFieldTouched(
+                "difficult",
+                true,
+              )
+            }
+            className="w-full rounded-md border border-gray-600 bg-gray-700 px-3 py-2 text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Select</option>
+            <option value="Easy">Easy</option>
+            <option value="Medium">Medium</option>
+            <option value="Hard">Hard</option>
+          </select>
+
+          {formik.touched.difficult &&
+            formik.errors.difficult && (
+              <p className="mt-1 text-sm text-red-500">
+                {formik.errors.difficult}
+              </p>
+            )}
+        </div>
+
+
       </div>
-
-      <div className="w-full md:w-1/2">
-        <label className="mb-2 block text-sm font-medium text-gray-300">
-          Difficulty Level
-        </label>
-
-        <select
-          name="difficult"
-          value={formik.values.difficult}
-          onChange={(event) =>
-            formik.setFieldValue(
-              "difficult",
-              event.target.value,
-            )
-          }
-          onBlur={() =>
-            formik.setFieldTouched(
-              "difficult",
-              true,
-            )
-          }
-          className="w-full rounded-md border border-gray-600 bg-gray-700 px-3 py-2 text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Select</option>
-          <option value="Easy">Easy</option>
-          <option value="Medium">Medium</option>
-          <option value="Hard">Hard</option>
-        </select>
-
-        {formik.touched.difficult &&
-          formik.errors.difficult && (
-            <p className="mt-1 text-sm text-red-500">
-              {formik.errors.difficult}
-            </p>
-          )}
-      </div>
-
       <Input
         type="text"
         name="description"
-        lable="Description"
-        placeholder="Describe your project in detail..."
-        value={formik.values.description}
         inputType="textarea"
+        lable="Description"
+        placeholder="Brief project description"
+        value={formik.values.description}
         onChange={(value) =>
-          formik.setFieldValue(
-            "description",
-            value,
-          )
+          formik.setFieldValue("description", value)
         }
         onBlur={() =>
           formik.setFieldTouched(
@@ -565,85 +469,33 @@ const CreateProject = () => {
         }
       />
 
-      <div>
-        <label className="mb-2 block text-sm font-medium text-gray-300">
-          Key Features
-        </label>
 
-        <div className="space-y-3">
-          {formik.values.features.map(
-            (feature, index) => (
-              <Input
-                key={`feature-${index}`}
-                type="text"
-                name={`feature-${index}`}
-                placeholder={`Feature ${index + 1}`}
-                value={feature}
-                onChange={(value) =>
-                  updateFeature(index, value)
-                }
-              />
-            ),
-          )}
-        </div>
 
-        <div className="mt-3">
-          <Button
-            type="button"
-            text="Add Feature"
-            varient="secondary"
-            onClick={addFeature}
-          />
-        </div>
-
-        {formik.touched.features &&
-          typeof formik.errors.features ===
-          "string" && (
-            <p className="mt-1 text-sm text-red-500">
-              {formik.errors.features}
-            </p>
-          )}
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-medium text-gray-300">
-          Tech Stack
-        </label>
-
-        <div className="space-y-3">
-          {formik.values.techStack.map(
-            (tech, index) => (
-              <Input
-                key={`tech-${index}`}
-                type="text"
-                name={`tech-${index}`}
-                placeholder={`Tech ${index + 1}`}
-                value={tech}
-                onChange={(value) =>
-                  updateTechStack(index, value)
-                }
-              />
-            ),
-          )}
-        </div>
-
-        <div className="mt-3">
-          <Button
-            type="button"
-            text="Add Tech Stack"
-            varient="secondary"
-            onClick={addTechStack}
-          />
-        </div>
-
-        {formik.touched.techStack &&
-          typeof formik.errors.techStack ===
-          "string" && (
-            <p className="mt-1 text-sm text-red-500">
-              {formik.errors.techStack}
-            </p>
-          )}
-      </div>
+      <Input
+        type="text"
+        name="content"
+        lable="Content"
+        placeholder="Describe your project in detail..."
+        value={formik.values.content}
+        inputType="textarea"
+        onChange={(value) =>
+          formik.setFieldValue(
+            "content",
+            value,
+          )
+        }
+        onBlur={() =>
+          formik.setFieldTouched(
+            "content",
+            true,
+          )
+        }
+        error={
+          formik.touched.content
+            ? formik.errors.content
+            : undefined
+        }
+      />
 
       <div className="flex justify-end gap-3 border-t border-gray-700 pt-6">
         {isEditMode && (

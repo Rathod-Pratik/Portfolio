@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@apiClient";
 import { DELETE_SKILL, GET_SKILL } from "@api";
 import { toast } from "react-toastify";
@@ -10,6 +10,7 @@ import type { AxiosError } from "axios";
 import { FaEdit, FaTrash, FaPlus } from "react-icons/fa";
 import { Loading, Input, Button } from "@components";
 import type { AdminSkillItem } from "@Type";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 const useDebounce = <T,>(value: T, delay = 500) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -35,14 +36,26 @@ const Skill = () => {
   const debouncedSearch = useDebounce(searchTerm, 500);
 
   const {
-    data: skills = [],
+    data,
     isLoading,
-  } = useQuery<AdminSkillItem[]>({
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage = false,
+  } = useInfiniteQuery<AdminSkillItem[]>({
     queryKey: ["skills"],
-    queryFn: async () => {
-      const response = await apiClient.get(`${GET_SKILL}?page=1&limit=20`);
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const response = await apiClient.get(`${GET_SKILL}?page=${pageParam}&limit=20`);
       return response.data.data as AdminSkillItem[];
     },
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === 20 ? allPages.length + 1 : undefined,
+  });
+  const skills = data?.pages.flat() ?? [];
+  const loadMoreRef = useInfiniteScroll({
+    hasNextPage,
+    isLoading: isFetchingNextPage,
+    onLoadMore: fetchNextPage,
   });
 
   const filteredSkills = useMemo(() => {
@@ -96,23 +109,23 @@ const Skill = () => {
 
   return (
     <div>
-      <div className="flex justify-evenly items-center gap-3 py-5">
-        <div className="w-[90%]">
+      <div className="flex  gap-3 py-5">
+        <div className="min-w-0 flex-1">
           <Input
             type="text"
-            name="search"
             placeholder="Search Skills"
             value={searchTerm}
             inputType="input"
+             textColor="text-gray-500"
             onChange={(value) => setSearchTerm(value)}
+            style="border-2 border-gray-500 bg-white"
           />
         </div>
 
         <Button
           type="button"
           text="New"
-          Icon={FaPlus}
-          varient="primary"
+          varient="secondary"
           onClick={() => router.push("/Dashboard/Skills/create")}
         />
       </div>
@@ -133,15 +146,15 @@ const Skill = () => {
             </span>
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-6 p-4">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-6">
             {filteredSkills.map((item) => (
               <div
                 key={item._id}
-                className="w-full max-w-[250px] mx-auto rounded-[20px] py-4 hover:scale-110 transition-all duration-300 flex flex-col justify-between bg-slate-900 border border-white/10 shadow-lg shadow-black/20"
+                className="w-64 mx-auto rounded-[20px]  py-4 hover:scale-110 transition-all duration-300 flex flex-col justify-between bg-slate-800 border-black border shadow-lg shadow-black/20"
               >
-                <div className="flex flex-col items-center text-center my-[18px]">
+                <div className="flex flex-col items-center text-center my-4.5">
                   <div
-                    className="w-[120px] h-[120px] flex items-center mt-4 justify-center relative rounded-full"
+                    className="w-30 h-30 flex items-center mt-4 justify-center relative rounded-full"
                     style={{
                       background: `conic-gradient(
                         ${item.color} ${Number(item.percentage) * 3.6}deg,
@@ -149,7 +162,7 @@ const Skill = () => {
                       )`,
                     }}
                   >
-                    <div className="w-[90px] sm:w-[100px] md:w-[110px] h-[90px] sm:h-[100px] md:h-[110px] bg-slate-950 rounded-full flex items-center justify-center">
+                    <div className="w-22.5 h-22.5 sm:w-25 sm:h-25  md:w-27.5 md:h-27.5 bg-slate-950 rounded-full flex items-center justify-center">
                       <div
                         className="absolute text-[20px] sm:text-[22px] md:text-[24px] font-bold"
                         style={{ color: item.color }}
@@ -164,11 +177,11 @@ const Skill = () => {
                   </div>
                 </div>
 
-                <div className="px-6 py-4">
-                  <div className="flex justify-evenly space-x-3">
+                <div className="py-4 px-6">
+                  <div className="flex justify-between gap-2">
                     <Button
                       type="button"
-                      text="Edit"
+                      text="  Edit  "
                       Icon={FaEdit}
                       varient="secondary"
                       onClick={() =>
@@ -187,6 +200,12 @@ const Skill = () => {
                 </div>
               </div>
             ))}
+            <div ref={loadMoreRef} className="col-span-full h-1" />
+            {isFetchingNextPage && (
+              <div className="col-span-full text-center text-gray-400">
+                Loading more skills...
+              </div>
+            )}
           </div>
         )}
       </div>

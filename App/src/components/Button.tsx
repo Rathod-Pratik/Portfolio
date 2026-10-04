@@ -12,6 +12,7 @@ type ButtonProps = {
   isDisabled?: boolean;
   type?: "button" | "submit" | "reset";
   className?: string;
+
 };
 
 const Button: React.FC<ButtonProps> = ({
@@ -56,8 +57,8 @@ const Button: React.FC<ButtonProps> = ({
         disabled={disabled}
         className={`font-medium py-2 px-5 rounded-md transition-colors flex items-center justify-center gap-2 cursor-pointer ${
           isSubmitting
-            ? "bg-gray-600 text-gray-100 cursor-not-allowed opacity-70"
-            : "bg-gray-700 hover:bg-gray-600 text-gray-200 hover:text-white"
+            ? "bg-blue-600 text-blue-100 cursor-not-allowed opacity-70"
+            : "bg-blue-500 hover:bg-blue-700 text-gray-200 hover:text-white"
         } ${className}`}
       >
         {Icon && <Icon size={16} />}

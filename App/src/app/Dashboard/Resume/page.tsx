@@ -154,14 +154,7 @@ const Resume = () => {
 
     return (
         <div>
-            <Button
-                type="button"
-                text={resumeFile ? "Update Resume" : "Add Resume"}
-                onClick={() => {
-                    formik.resetForm();
-                    setShowModel(true);
-                }}
-            />
+
 
             {showModel && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
@@ -244,9 +237,21 @@ const Resume = () => {
 
             {resumeFile?.CV && (
                 <div className="mt-6">
-                    <h2 className="mb-4 text-2xl font-bold text-white">
-                        Resume
-                    </h2>
+                    <div className="flex items-center justify-between mb-4">
+
+                        <h2 className="mb-4 text-2xl font-bold text-white">
+                            Resume
+                        </h2>
+                        <Button
+                            type="button"
+                            text={resumeFile ? "Update" : "Add"}
+                            onClick={() => {
+                                formik.resetForm();
+                                setShowModel(true);
+                            }}
+                        />
+                    </div>
+
 
                     <iframe
                         src={resumeFile.CV}

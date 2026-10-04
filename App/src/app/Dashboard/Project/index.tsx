@@ -1,13 +1,14 @@
 "use client";
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { FaEdit, FaExternalLinkAlt, FaTrash } from "react-icons/fa";
+import { FaEdit, FaTrash } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { DELETE_PROJECT, GET_PROJECT } from "@api";
 import apiClient from "@apiClient";
-import { Loading } from "@components";
+import { Button, Input, Loading } from "@components";
 import type { AxiosError } from "axios";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 const Projects = () => {
   const router = useRouter();
@@ -15,14 +16,29 @@ const Projects = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const { data: projects = [], isLoading: loading } = useQuery({
+  const {
+    data,
+    isLoading: loading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage = false,
+  } = useInfiniteQuery({
     queryKey: ["projects"],
-    queryFn: async () => {
-      const response = await apiClient.get(`${GET_PROJECT}?page=1&limit=100`, {
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const response = await apiClient.get(`${GET_PROJECT}?page=${pageParam}&limit=20`, {
         withCredentials: true,
       });
       return response.data.data ?? [];
     },
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === 20 ? allPages.length + 1 : undefined,
+  });
+  const projects = data?.pages.flat() ?? [];
+  const loadMoreRef = useInfiniteScroll({
+    hasNextPage,
+    isLoading: isFetchingNextPage,
+    onLoadMore: fetchNextPage,
   });
 
   const filteredProjects = useMemo(() => {
@@ -31,7 +47,7 @@ const Projects = () => {
       return projects;
     }
 
-    return projects.filter((item) => item.title.toLowerCase().includes(keyword));
+    return projects.filter((item:any) => item.title.toLowerCase().includes(keyword));
   }, [projects, searchTerm]);
 
   const handleDeleteProject = async (projectId: string) => {
@@ -67,20 +83,23 @@ const Projects = () => {
 
   return (
     <div>
-      <div className="flex justify-evenly gap-3 py-5">
-        <input
-          type="text"
-          placeholder="Search Project"
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
-          className="border-2 text-gray-500 outline-none rounded-md px-4 py-2 w-[90%]"
-        />
-        <button
+      <div className="flex  gap-3 py-5">
+        <div className="min-w-0 flex-1">
+          <Input
+            type="text"
+            placeholder="Search Project"
+            value={searchTerm}
+            onChange={setSearchTerm}
+            textColor="text-gray-500"
+            style="border-2 border-gray-500 bg-white px-4 py-2"
+          />
+        </div>
+        <Button
+          text="New"
+          title="New Project"
           onClick={() => router.push("/Dashboard/Project/create")}
-          className="text-white bg-blue-500 px-5 py-2 rounded-md cursor-pointer"
-        >
-          New
-        </button>
+          varient="secondary"
+        />
       </div>
 
       {loading ? (
@@ -88,8 +107,8 @@ const Projects = () => {
           <Loading />
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6 p-4">
-          {filteredProjects.map((item) => (
+        <div className="min-h-[80vh] grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6 ">
+          {filteredProjects.map((item :any) => (
             <div
               data-aos="fade-up"
               key={item._id}
@@ -103,64 +122,46 @@ const Projects = () => {
                 />
               </div>
 
-              <div className="flex flex-col flex-grow p-6">
+              <div className="flex flex-col grow p-6">
                 <h5 className="mb-2 text-xl font-bold text-gray-900 dark:text-white text-center">
                   {item.title}
                 </h5>
 
-                <div className="flex flex-wrap gap-2 justify-center mb-4">
-                  {(item.techStack ?? []).map((lang, index) => (
-                    <span
-                      key={`${item._id}-${index}`}
-                      className="px-2 py-1 rounded-md text-xs border border-gray-500 text-gray-300"
-                    >
-                      {lang}
-                    </span>
-                  ))}
-                </div>
+  
 
-                <div className="mb-4 flex-grow">
-                  <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3">
-                    {item.description}
+                <div className="mb-4 grow">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 text-left">
+                    {item.description.length > 70 ? `${item.description.slice(0, 125)}...` : item.description}
                   </p>
                 </div>
 
-                <div className="flex justify-center space-x-3 mb-4">
-                  {item.liveDemoLink && (
-                    <a
-                      className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition-colors"
-                      href={item.liveDemoLink}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <FaExternalLinkAlt className="mr-2" />
-                      Demo
-                    </a>
-                  )}
-                </div>
-
                 <div className="flex justify-center space-x-3 border-t pt-4">
-                  <button
+                  <Button
+                    text="Edit"
+                    varient="secondary"
+                    Icon={FaEdit}
                     onClick={() => router.push(`/Dashboard/Project/${item._id}`)}
-                    className="flex items-center px-4 py-2 border border-blue-500 text-blue-500 dark:text-blue-400 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                     title="Edit"
-                  >
-                    <FaEdit className="mr-2" />
-                    <span>Edit</span>
-                  </button>
-                  <button
+                  />
+                  <Button
+                    text="Delete"
+                    ProcessText="Deleting..."
+                    Icon={FaTrash}
+                    varient="danger"
                     onClick={() => handleDeleteProject(item._id)}
-                    disabled={deletingId === item._id}
-                    className="flex items-center px-4 py-2 border border-red-500 text-red-500 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    isSubmitting={deletingId === item._id}
                     title="Delete"
-                  >
-                    <FaTrash className="mr-2" />
-                    <span>{deletingId === item._id ? "Deleting..." : "Delete"}</span>
-                  </button>
+                  />
                 </div>
               </div>
             </div>
           ))}
+          <div ref={loadMoreRef} className="col-span-full h-1" />
+          {isFetchingNextPage && (
+            <div className="col-span-full text-center text-gray-400">
+              Loading more projects...
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -34,11 +34,15 @@ const Sidebar = () => {
       ? pathname === href
       : pathname === href || pathname.startsWith(`${href}/`);
 
+  const updateSidebarState = (open: boolean) => {
+    setIsOpen(open);
+  };
+
   useEffect(() => {
     const updateViewport = () => {
       const mobile = window.innerWidth < 1280;
       setIsMobile(mobile);
-      setIsOpen(!mobile);
+      updateSidebarState(!mobile);
     };
 
     updateViewport();
@@ -47,7 +51,9 @@ const Sidebar = () => {
   }, []);
 
   useEffect(() => {
-    const toggle = () => setIsOpen((open) => !open);
+    const toggle = () => {
+      setIsOpen((open) => !open);
+    };
     const close = (event: Event) => {
       const customEvent = event as CustomEvent<{ isOpen?: boolean }>;
       setIsOpen(Boolean(customEvent.detail?.isOpen));
@@ -60,6 +66,14 @@ const Sidebar = () => {
       window.removeEventListener('admin-sidebar-state', close);
     };
   }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('admin-sidebar-state', {
+        detail: { isOpen },
+      }),
+    );
+  }, [isOpen]);
 
   useEffect(() => {
     document.body.style.overflow = isMobile && isOpen ? 'hidden' : 'auto';
@@ -86,7 +100,7 @@ const Sidebar = () => {
         <button
           type="button"
           aria-label="Close admin sidebar"
-          onClick={() => setIsOpen(false)}
+          onClick={() => updateSidebarState(false)}
           className="fixed inset-0 z-40 bg-black/50"
         />
       )}
@@ -106,7 +120,7 @@ const Sidebar = () => {
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => isMobile && setIsOpen(false)}
+              onClick={() => isMobile && updateSidebarState(false)}
               className={`flex items-center gap-4 rounded-md px-4 py-3 transition ${
                 isActive(item.href)
                   ? 'bg-blue-500 text-white'

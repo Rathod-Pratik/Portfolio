@@ -274,7 +274,7 @@ const CreateNote = ({ params }: PageProps) => {
   return (
     <form
       onSubmit={handleFormSubmit}
-      className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto"
+      className="sm:p-6 space-y-6  mx-auto"
     >
       {/* Top Header */}
       <div className="flex items-center justify-between gap-3 pb-4 border-b border-gray-700">
@@ -282,11 +282,6 @@ const CreateNote = ({ params }: PageProps) => {
           <h2 className="text-2xl font-bold text-white">
             {isEdit ? "Edit Note" : "Create Note"}
           </h2>
-          <p className="text-xs text-gray-400 mt-1">
-            {isEdit
-              ? "Update details, cover image, or PDF document for this note"
-              : "Upload and publish a new study note or cheatsheet"}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -296,18 +291,6 @@ const CreateNote = ({ params }: PageProps) => {
             onClick={() => router.push("/Dashboard/Notes")}
             title="Back to Notes"
           />
-          {isEdit && (
-            <Button
-              type="button"
-              varient="danger"
-              text="Delete"
-              Icon={FiTrash2}
-              onClick={handleDelete}
-              title="Delete Note"
-              isSubmitting={isDeleting}
-              ProcessText="Deleting..."
-            />
-          )}
         </div>
       </div>
 
@@ -318,6 +301,7 @@ const CreateNote = ({ params }: PageProps) => {
           lable="Note Cover Image"
           inputType="Image"
           imagePreview={formik.values.imageUrl}
+          style="object-contain w-full h-48 rounded-lg border border-gray-600"
           handleImageChange={(file) => {
             formik.setFieldValue("image", file ?? undefined);
             formik.setFieldTouched("image", true);
@@ -369,7 +353,7 @@ const CreateNote = ({ params }: PageProps) => {
               </div>
               <div className="flex flex-col overflow-hidden">
                 <span className="text-sm text-white truncate font-medium">
-                  {pdfFileName || "Click to choose PDF file"}
+                  {pdfFileName ? formik.values.title+'.pdf' : "Click to choose PDF file"}
                 </span>
                 <span className="text-xs text-gray-400">
                   {formik.values.pdf
@@ -422,13 +406,6 @@ const CreateNote = ({ params }: PageProps) => {
 
       {/* Form Action Buttons */}
       <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-700">
-        <Button
-          type="button"
-          varient="secondary"
-          text="Cancel"
-          onClick={() => router.push("/Dashboard/Notes")}
-          title="Cancel"
-        />
 
         {isEdit && (
           <Button
