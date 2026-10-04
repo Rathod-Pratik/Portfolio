@@ -15,7 +15,10 @@ export const CreateProjectSchema = z.object({
         .string()
         .trim()
         .min(1, 'Description is required'),
-
+    content: z
+        .string()
+        .trim()
+        .min(1, 'Content is required'),
     difficult: z
         .string()
         .trim()
@@ -39,10 +42,10 @@ export const EditProjectSchema = z.object({
         .trim()
         .min(1, 'Subtitle cannot be empty')
         .optional(),
-    description: z
+    content: z
         .string()
         .trim()
-        .min(1, 'Description cannot be empty')
+        .min(1, 'Content cannot be empty')
         .optional(),
     difficult: z
         .string()

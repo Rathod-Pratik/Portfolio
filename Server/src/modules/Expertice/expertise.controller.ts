@@ -418,4 +418,4 @@ export const deleteExpertise = async (
             message: "Internal server error"
         });
     }
-};
+};

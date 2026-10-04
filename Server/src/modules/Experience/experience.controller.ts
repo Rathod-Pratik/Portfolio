@@ -349,4 +349,4 @@ export const deleteExperience = async (
             message: "Internal server error"
         });
     }
-};
+};

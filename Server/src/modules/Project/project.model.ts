@@ -17,8 +17,12 @@ const projectSchema = new mongoose.Schema<IProject>(
       enum: ["Easy", "Medium", "Hard"],
     },
     image: {
-      type: String, 
+      type: String,
     },
+    content: {
+      type: String,
+      trim: true,
+    }
   },
   { timestamps: true }
 );

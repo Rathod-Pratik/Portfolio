@@ -35,4 +35,4 @@ const experienceSchema = new mongoose.Schema<IExperience>(
 
 export type ExperienceDocument = HydratedDocument<IExperience>;
 
-export const ExperienceModel = mongoose.model<IExperience>("experience", experienceSchema);
+export const ExperienceModel = mongoose.model<IExperience>("experiences", experienceSchema);

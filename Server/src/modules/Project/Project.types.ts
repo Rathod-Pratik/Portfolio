@@ -3,6 +3,7 @@ export interface IProject {
     subtitle?: string;
     difficult?: string;
     image?: string;
+    content?: string;
 }
 
 export interface ICreateProjectJob {

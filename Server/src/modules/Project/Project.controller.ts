@@ -27,7 +27,7 @@ export const CreateProject = async (
     const {
       title,
       subtitle,
-      description,
+      content,
       difficult
     } = validation.data;
     const file = getUploadedFile(req);
@@ -52,6 +52,7 @@ export const CreateProject = async (
       subtitle,
       difficult,
       image: uploadedFile.key,
+      content
     });
 
     await sendInfoNotification(
@@ -186,7 +187,7 @@ export const EditProject = async (
       _id,
       title,
       subtitle,
-      description,
+      content,
     } = validation.data;
     const file = getUploadedFile(req);
 
@@ -200,7 +201,7 @@ export const EditProject = async (
     if (title) EditData.title = title;
     if (difficult) EditData.difficult = difficult;
     if (subtitle) EditData.subtitle = subtitle;
-    if (description) EditData.description = description;
+    if (content) EditData.content = content;
 
     if (file) {
       const uploadedFile = await uploadFileToS3({
