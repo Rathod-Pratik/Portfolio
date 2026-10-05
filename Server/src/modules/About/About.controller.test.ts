@@ -31,8 +31,8 @@ jest.unstable_mockModule("@utils", () => ({
   },
 }));
 
-const { getAbout, updateAbout } = await import("./About.controller.ts");
-const { AboutModel } = await import("./About.model.ts");
+const { getAbout, updateAbout } = await import("./about.controller.ts");
+const { AboutModel } = await import("./about.model.ts");
 const { addAboutCacheJob } = await import("./About.queue.ts");
 const { getCache, setCache, getCacheVersion } = await import("@utils");
 const { sendInfoNotification } = await import("@modules/Notification/Notification.service.ts");

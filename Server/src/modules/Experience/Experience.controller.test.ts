@@ -44,9 +44,9 @@ const {
   getExperienceById,
   updateExperience,
   deleteExperience,
-} = await import("./Experience.controller.ts");
+} = await import("./experience.controller.ts");
 
-const { ExperienceModel } = await import("./Experience.model.ts");
+const { ExperienceModel } = await import("./experience.model.ts");
 const { addCreateExperienceJob, addUpdateExperienceJob } = await import("./Experience.queue.ts");
 const {
   getCache,

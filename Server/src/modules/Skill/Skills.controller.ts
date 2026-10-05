@@ -1,4 +1,4 @@
-import { SkillsModel } from "./Skills.model.ts";
+import { SkillsModel } from "./skills.model.ts";
 import type { Request, Response } from "express";
 import {
     CreateSkillSchema,

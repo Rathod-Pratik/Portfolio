@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { ExpertiseModel } from "./Expertise.model.ts";
+import { ExpertiseModel } from "./expertise.model.ts";
 import {
     Get_Signed_Url,
     uploadFileToS3,

@@ -3,7 +3,7 @@ import { bellmqConnection } from "@config/redis.ts";
 import { AboutCacheKeys, incrementCacheVersion, logger } from "@utils";
 
 import type { IAboutCacheJob } from "./About.types.ts";
-import { AboutModel } from "./About.model.ts";
+import { AboutModel } from "./about.model.ts";
 
 export const aboutWorker = new Worker<IAboutCacheJob>(
     "about",
@@ -53,4 +53,4 @@ aboutWorker.on("error", (error) => {
         "About worker error",
         error instanceof Error ? error : { context: "AboutWorker", metadata: { error: String(error) } }
     );
-});
+});

@@ -1,7 +1,7 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
 import { ProjectCacheKeys, incrementCacheVersion, logger } from "@utils";
-import { Project } from "./Project.model.ts";
+import { Project } from "./project.model.ts";
 import type { IProjectJob } from "./Project.types.ts";
 
 export const projectWorker = new Worker<IProjectJob>(
@@ -71,4 +71,4 @@ projectWorker.on("failed", (job, error) => {
         `Project job failed: ${job?.id}`,
         error instanceof Error ? error : { context: "ProjectWorker", metadata: { jobId: job?.id, error: String(error) } }
     );
-});
+});

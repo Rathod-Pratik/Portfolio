@@ -2,7 +2,7 @@ import express from "express";
 import {
     getHero,
     updateHero,
-} from "./Hero.controller.ts";
+} from "./hero.controller.ts";
 import { checkAdminCookie } from "@Middleware/Auth.middleware.ts";
 import { uploadFiles } from "@Middleware/multer.middleware.ts";
 import { Validate } from "@Middleware/Validation.middleware.ts";

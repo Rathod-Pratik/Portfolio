@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { ExperienceModel } from "./Experience.model.ts";
+import { ExperienceModel } from "./experience.model.ts";
 import {
     incrementCacheVersion,
     ExperienceCacheKeys,
@@ -104,4 +104,4 @@ experienceWorker.on(
             error instanceof Error ? error : { context: "ExperienceWorker", metadata: { error: String(error) } }
         );
     }
-);
+);

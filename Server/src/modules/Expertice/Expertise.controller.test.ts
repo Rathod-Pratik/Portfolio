@@ -54,9 +54,9 @@ const {
   getExpertiseById,
   updateExpertise,
   deleteExpertise,
-} = await import("./Expertise.controller.ts");
+} = await import("./expertise.controller.ts");
 
-const { ExpertiseModel } = await import("./Expertise.model.ts");
+const { ExpertiseModel } = await import("./expertise.model.ts");
 const { addCreateExpertiseJob, addUpdateExpertiseJob } = await import("./Expertise.queue.ts");
 const {
   Get_Signed_Url,

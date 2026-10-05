@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { HeroModel } from "./Hero.model.ts";
+import { HeroModel } from "./hero.model.ts";
 import {
     getCache,
     setCache,
@@ -168,4 +168,4 @@ export const updateHero = async (
             message: "Internal server error",
         });
     }
-};
+};

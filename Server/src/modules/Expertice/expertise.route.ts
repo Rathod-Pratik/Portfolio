@@ -5,7 +5,7 @@ import {
     getExpertiseById,
     updateExpertise,
     deleteExpertise,
-} from "./Expertise.controller.ts";
+} from "./expertise.controller.ts";
 import { checkAdminCookie } from "@Middleware/Auth.middleware.ts";
 import { uploadFiles } from "@Middleware/multer.middleware.ts";
 import { Validate } from "@Middleware/Validation.middleware.ts";

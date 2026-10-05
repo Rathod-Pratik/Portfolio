@@ -52,9 +52,9 @@ const {
   getBlogBySlug,
   updateBlog,
   deleteBlog,
-} = await import("./Blog.controller.ts");
+} = await import("./blog.controller.ts");
 
-const { blogModel } = await import("./Blog.model.ts");
+const { blogModel } = await import("./blog.model.ts");
 const { CreateBlogJob } = await import("./Blog.queue.ts");
 const {
   Get_Signed_Url,

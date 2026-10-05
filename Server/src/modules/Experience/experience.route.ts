@@ -5,7 +5,7 @@ import {
     getExperienceById,
     updateExperience,
     deleteExperience,
-} from "./Experience.controller.ts";
+} from "./experience.controller.ts";
 import { checkAdminCookie } from "@Middleware/Auth.middleware.ts";
 import { Validate } from "@Middleware/Validation.middleware.ts";
 import {

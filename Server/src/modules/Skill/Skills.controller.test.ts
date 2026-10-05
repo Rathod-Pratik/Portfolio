@@ -43,7 +43,7 @@ const {
   GetSkill,
 } = await import("./Skills.controller.ts");
 
-const { SkillsModel } = await import("./Skills.model.ts");
+const { SkillsModel } = await import("./skills.model.ts");
 const { addCreateSkillJob, addUpdateSkillJob } = await import("./Skill.queue.ts");
 const {
   getCache,

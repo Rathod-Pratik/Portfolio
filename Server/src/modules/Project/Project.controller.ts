@@ -1,4 +1,4 @@
-import { Project } from './Project.model.ts';
+import { Project } from './project.model.ts';
 import { Get_Signed_Url, getUploadedFile, uploadFileToS3, logger, incrementCacheVersion, ProjectCacheKeys } from '@utils';
 import type { Request, Response } from 'express';
 import { CreateProjectSchema, EditProjectSchema } from './Project.validation.ts';

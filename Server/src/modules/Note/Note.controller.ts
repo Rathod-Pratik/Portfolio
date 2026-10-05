@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { NoteModel } from "./Note.model.ts";
+import { NoteModel } from "./note.model.ts";
 import {
     addCreateNoteJob,
     addUpdateNoteJob,
@@ -545,4 +545,4 @@ export const DeleteNote = async (
                     : String(error),
         });
     }
-};
+};

@@ -5,7 +5,7 @@ import {
     incrementCacheVersion,
     logger,
 } from "@utils";
-import { blogModel } from "./Blog.model.ts";
+import { blogModel } from "./blog.model.ts";
 import type {
     IBlogCacheJob,
 } from "./Blog.queue.ts";
@@ -117,4 +117,4 @@ blogWorker.on("error", (error) => {
         "Blog worker error",
         error instanceof Error ? error : { context: "BlogWorker", metadata: { error: String(error) } }
     );
-});
+});

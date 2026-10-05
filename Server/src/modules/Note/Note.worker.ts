@@ -6,7 +6,7 @@ import {
     logger,
 } from "@utils";
 import { NOTE_QUEUE_NAME } from "./Note.queue.ts";
-import { NoteModel } from "./Note.model.ts";
+import { NoteModel } from "./note.model.ts";
 import type { INoteJob } from "./Note.types.ts";
 
 export const noteWorker = new Worker<INoteJob>(
@@ -83,4 +83,4 @@ noteWorker.on("error", (error) => {
         "Note worker error",
         error instanceof Error ? error : { context: "NoteWorker", metadata: { error: String(error) } }
     );
-});
+});

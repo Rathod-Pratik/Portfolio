@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { HeroModel } from "./Hero.model.ts";
+import { HeroModel } from "./hero.model.ts";
 import {
     incrementCacheVersion,
     HeroCacheKeys,
@@ -75,4 +75,4 @@ heroWorker.on(
             error instanceof Error ? error : { context: "HeroWorker", metadata: { error: String(error) } }
         );
     }
-);
+);
