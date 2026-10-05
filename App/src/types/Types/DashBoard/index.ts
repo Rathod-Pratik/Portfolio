@@ -1,5 +1,12 @@
 
 
+export interface ExpertiseItem {
+    _id?: string;
+    title: string;
+    description: string;
+    image: string;
+}
+
 export interface ExpertiseFormData {
     _id?: string;
     title: string;

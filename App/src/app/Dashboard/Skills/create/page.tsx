@@ -1,3 +1,3 @@
-import SkillEditor from '../[id]';
+import SkillEditor from '../[id]/page';
 
 export default SkillEditor;

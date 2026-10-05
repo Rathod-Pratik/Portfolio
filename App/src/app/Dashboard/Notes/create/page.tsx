@@ -1,3 +1,3 @@
-import NoteEditor from '../[id]';
+import NoteEditor from '../[id]/page';
 
 export default NoteEditor;

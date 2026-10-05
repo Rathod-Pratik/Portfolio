@@ -1,3 +1,3 @@
-import BlogEditor from '../[id]';
+import BlogEditor from '../[id]/page';
 
 export default BlogEditor;
