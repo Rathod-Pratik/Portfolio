@@ -70,7 +70,7 @@ const Projects = () => {
       const apiError = error as AxiosError;
       if (apiError.response?.status === 403) {
         toast.error("Access denied. Please login as admin.");
-        router.push("/Auth/Login");
+        router.push("/login");
         return;
       }
 

@@ -238,7 +238,7 @@ const CreateProject = () => {
           toast.error(
             "Access denied. Please login as admin.",
           );
-          router.push("/Auth/Login");
+          router.push("/login");
           return;
         }
 
@@ -305,7 +305,7 @@ const CreateProject = () => {
         toast.error(
           "Access denied. Please login as admin.",
         );
-        router.push("/Auth/Login");
+        router.push("/login");
         return;
       }
 

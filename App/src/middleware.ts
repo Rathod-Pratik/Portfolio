@@ -5,7 +5,7 @@ export async function middleware(request: NextRequest) {
   const adminCookie = request.cookies.get('admin');
 
   if (!adminCookie?.value) {
-    return NextResponse.redirect(new URL('/Auth/Login', request.url));
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   try {
@@ -19,10 +19,10 @@ export async function middleware(request: NextRequest) {
     });
 
     if (!response.ok) {
-      return NextResponse.redirect(new URL('/Auth/Login', request.url));
+      return NextResponse.redirect(new URL('/login', request.url));
     }
   } catch {
-    return NextResponse.redirect(new URL('/Auth/Login', request.url));
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   return NextResponse.next();

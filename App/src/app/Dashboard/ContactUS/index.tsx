@@ -96,7 +96,7 @@ const ContactUs = () => {
       const apiError = error as AxiosError<{ message?: string }>;
       if (apiError.response?.status === 401 || apiError.response?.status === 403) {
         toast.error("Your admin session is invalid. Please login again.");
-        router.push("/Auth/Login");
+        router.push("/login");
         return;
       }
       toast.error(apiError.response?.data?.message || "Failed to update contact status.");
@@ -132,7 +132,7 @@ const ContactUs = () => {
 
     if (apiError.response?.status === 401 || apiError.response?.status === 403) {
       toast.error("Access denied. Please login as admin.");
-      router.push("/Auth/Login");
+      router.push("/login");
       return;
     }
 
@@ -167,7 +167,7 @@ const ContactUs = () => {
 
       if (apiError.response?.status === 401 || apiError.response?.status === 403) {
         toast.error("Access denied. Please login as admin.");
-        router.push("/Auth/Login");
+        router.push("/login");
         return;
       }
 

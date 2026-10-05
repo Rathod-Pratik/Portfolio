@@ -28,7 +28,7 @@ export default function ForgotPassword() {
                 await apiClient.post(FORGOT_PASSWORD, { email: normalizedEmail });
                 sessionStorage.setItem("resetEmail", normalizedEmail);
                 toast.success("OTP sent to your email.");
-                router.push("/Auth/ResetPassword/otp");
+                router.push("/reset-password/otp");
             } catch (error) {
                 const apiError = error as AxiosError<ApiError>;
                 toast.error(

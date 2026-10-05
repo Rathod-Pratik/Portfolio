@@ -138,7 +138,7 @@ const Resume = () => {
                         "Access denied. Please login as admin."
                     );
 
-                    router.push("/Auth/Login");
+                    router.push("/login");
                     return;
                 }
 

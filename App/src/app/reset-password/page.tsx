@@ -51,7 +51,7 @@ const ForgotPassword = () => {
 
                     toast.success("OTP sent to your email.");
 
-                    router.push("/Auth/ResetPassword/otp");
+                    router.push("/reset-password/otp");
                 }
             } catch (error) {
                 const apiError = error as AxiosError<{
@@ -126,7 +126,7 @@ const ForgotPassword = () => {
                             text="Back to Login"
                             varient="secondary"
                             isDisabled={formik.isSubmitting}
-                            onClick={() => router.push("/Auth/Login")}
+                            onClick={() => router.push("/login")}
                             className="w-full"
                         />
                     </div>

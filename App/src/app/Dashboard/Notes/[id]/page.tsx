@@ -173,7 +173,7 @@ const CreateNote = ({ params }: PageProps) => {
 
         if (apiError.response?.status === 401 || apiError.response?.status === 403) {
           toast.error("Access denied. Please login as admin.");
-          router.push("/Auth/Login");
+          router.push("/login");
           return;
         }
 
@@ -212,7 +212,7 @@ const CreateNote = ({ params }: PageProps) => {
       const apiError = error as AxiosError<{ message?: string }>;
       if (apiError.response?.status === 401 || apiError.response?.status === 403) {
         toast.error("Access denied. Please login as admin.");
-        router.push("/Auth/Login");
+        router.push("/login");
         return;
       }
       console.error("DeleteNote Error:", apiError);

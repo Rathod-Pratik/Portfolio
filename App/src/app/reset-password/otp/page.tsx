@@ -26,7 +26,7 @@ export default function VerifyResetOtp() {
         try {
             await apiClient.post(VERIFY_OTP, { email, otp });
             toast.success("OTP verified successfully.");
-            router.push("/Auth/ResetPassword/new");
+            router.push("/reset-password/new");
         } catch (error) {
             const apiError = error as AxiosError<ApiError>;
             toast.error(apiError.response?.data?.error || apiError.response?.data?.message || "Failed to verify OTP.");

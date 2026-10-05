@@ -56,10 +56,10 @@ const Login = () => {
 
                 if (response.status === 200) {
                     const { token, user } = response.data;
-                    toast.success("Login successful");
                     sessionStorage.setItem("token", token);
                     sessionStorage.setItem("user", JSON.stringify(user));
-                    router.push("/Dashboard");
+                    toast.success("Login successful");
+                    router.replace("/Dashboard");
                 }
             } catch (error) {
                 const apiError = error as AxiosError<{ error?: string }>;
@@ -76,7 +76,7 @@ const Login = () => {
     });
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-2 sm:px-6 lg:px-8">
+        <div className="min-h-[80vh] flex items-center justify-center px-2 sm:px-6 lg:px-8">
             <div className="relative shadow-xl rounded-2xl overflow-hidden w-full max-w-4xl flex flex-col lg:flex-row bg-[#111827] border border-gray-800">
                 {formik.isSubmitting && <Loading />}
 
@@ -175,7 +175,7 @@ const Login = () => {
                                 <button
                                     type="button"
                                     onClick={() =>
-                                        router.push("/Auth/Forgot-Password")
+                                        router.push("/forgot-password")
                                     }
                                     className="text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors"
                                 >

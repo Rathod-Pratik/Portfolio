@@ -60,7 +60,7 @@ const Notes = () => {
             const apiError = error as AxiosError<{ message?: string }>;
             if (apiError.response?.status === 401 || apiError.response?.status === 403) {
                 toast.error("Access denied. Please login as admin.");
-                return router.push("/Auth/Login");
+                return router.push("/login");
             }
             console.error("DeleteNote Error:", error);
             toast.error(apiError.response?.data?.message || "Failed to delete note.");

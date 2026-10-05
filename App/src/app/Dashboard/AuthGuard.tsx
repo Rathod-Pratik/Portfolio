@@ -24,7 +24,7 @@ const AuthGuard = () => {
       } catch {
         if (active) {
           clearClientSession();
-          router.replace(`/Auth/Login?redirect=${encodeURIComponent(pathname)}`);
+          router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
         }
       }
     };

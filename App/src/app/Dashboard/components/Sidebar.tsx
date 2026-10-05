@@ -88,7 +88,7 @@ const Sidebar = () => {
       localStorage.removeItem('auth-storage');
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
-      router.push('/Auth/Login');
+      router.push('/login');
     } catch {
       toast.error('Failed to logout');
     }

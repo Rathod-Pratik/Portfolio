@@ -18,7 +18,7 @@ apiClient.interceptors.response.use(
       sessionStorage.removeItem("user");
       localStorage.removeItem("auth-storage");
       window.location.replace(
-        `/Auth/Login?redirect=${encodeURIComponent(window.location.pathname)}`,
+        `/login?redirect=${encodeURIComponent(window.location.pathname)}`,
       );
     }
 

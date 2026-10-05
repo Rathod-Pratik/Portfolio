@@ -32,7 +32,7 @@ export default function ResetPassword() {
             await apiClient.post(RESET_PASSWORD, { email, password });
             sessionStorage.removeItem("resetEmail");
             toast.success("Password reset successfully.");
-            router.push("/Auth/Login");
+            router.push("/login");
         } catch (error) {
             const apiError = error as AxiosError<ApiError>;
             toast.error(apiError.response?.data?.error || apiError.response?.data?.message || "Failed to reset password.");
