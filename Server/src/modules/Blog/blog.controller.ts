@@ -1,4 +1,4 @@
-import { blogModel } from "./Blog.model.ts";
+import { blogModel } from "./blog.model.ts";
 import {
   Get_Signed_Url,
   getUploadedFile,
@@ -454,4 +454,4 @@ export const deleteBlog = async (
         "Error deleting blog"
     });
   }
-};
+};

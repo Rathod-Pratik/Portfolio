@@ -18,7 +18,7 @@ export const connectRedis = async () => {
     }
 
     await redis.connect();
-
+await redis.set('foo', 'bar');
     console.log("Redis connected");
 };
 

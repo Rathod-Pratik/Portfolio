@@ -41,7 +41,10 @@ type GetProjectsResponse = {
 
 type GetProjectResponse = {
 	success: boolean;
-	data: ProjectItem;
+	data: ProjectItem & {
+		createdAt: string;
+		content?: string;
+	};
 };
 
 export type {

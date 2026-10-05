@@ -9,6 +9,8 @@ import { GET_PROJECT } from '@/utils/constants';
 import type { GetProjectResponse, ProjectDetail } from '@/types';
 import { Loading } from '@/components';
 import { motion } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 
 export default function ProjectDetailsPage() {
   const params = useParams();
@@ -87,7 +89,9 @@ export default function ProjectDetailsPage() {
             {new Date(project.createdAt).toLocaleDateString()}
           </p>
         )}
-
+ <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+            {project.content}
+        </ReactMarkdown>
 
        
       </motion.div>
