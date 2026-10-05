@@ -10,6 +10,7 @@ import type { BlogDetail } from '@/types';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import Loading from '@/components/Loading';
 import { motion } from 'framer-motion';
+import rehypeRaw from 'rehype-raw';
 
 export default function BlogDetailsPage() {
   const params = useParams();
@@ -190,7 +191,7 @@ export default function BlogDetailsPage() {
 
         {blog.content && (
           <article className="markdown-body">
-            <ReactMarkdown components={markdownComponents}>
+            <ReactMarkdown rehypePlugins={[rehypeRaw]} components={markdownComponents}>
               {blog.content}
             </ReactMarkdown>
           </article>

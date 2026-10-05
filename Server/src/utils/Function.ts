@@ -135,9 +135,21 @@ export const Get_Signed_Url = async ({ key, downloadFileName }: GetSignedUrlType
   return url;
 };
 
-export const getUploadedFile = (req: Request): Express.Multer.File => {
-  const file = req.file as Express.Multer.File;
-  return file;
+export const getUploadedFile = (
+  req: Request,
+): Express.Multer.File | undefined => {
+  if (req.file) {
+    return req.file;
+  }
+
+  const files = req.files as
+    | {
+      file?: Express.Multer.File[];
+      image?: Express.Multer.File[];
+    }
+    | undefined;
+
+  return files?.file?.[0] ?? files?.image?.[0];
 }
 
 export const getFiles = (req: Request) => {

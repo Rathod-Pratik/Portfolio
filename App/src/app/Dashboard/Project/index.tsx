@@ -131,7 +131,7 @@ const Projects = () => {
 
                 <div className="mb-4 grow">
                   <p className="text-sm text-gray-600 dark:text-gray-300 text-left">
-                    {item.description.length > 70 ? `${item.description.slice(0, 125)}...` : item.description}
+                    {item.subtitle?.length > 70 ? `${item.subtitle.slice(0, 125)}...` : item.subtitle}
                   </p>
                 </div>
 

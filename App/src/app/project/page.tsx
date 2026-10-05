@@ -74,11 +74,9 @@ export default function Project() {
 
   const filteredProjects = useMemo(() => {
     const difficultyOrder: Record<ProjectDifficulty, number> = {
-      Advanced: 0,
       Hard: 1,
-      Intermediate: 2,
-      Medium: 3,
-      Easy: 4,
+      Medium: 2,
+      Easy: 3,
     };
 
     const sortedProjects = [...projects].sort((a, b) => {
@@ -123,11 +121,11 @@ export default function Project() {
           <p className="text-center text-gray-600 dark:text-gray-400 py-12">No projects available</p>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fit,minmax(420px,1fr))] gap-4 lg:gap-6 justify-items-center">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredProjects.map((item, index) => (
                 <motion.div
                   key={item._id || index}
-                  className="w-full flex justify-center"
+                  className="flex justify-center"
                   initial={{ opacity: 0, y: 18 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.2 }}

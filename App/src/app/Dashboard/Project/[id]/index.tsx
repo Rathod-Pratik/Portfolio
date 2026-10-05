@@ -22,7 +22,7 @@ type ProjectDifficulty = "Easy" | "Medium" | "Hard";
 type ProjectItem = {
   _id: string;
   title: string;
-  description?: string;
+  subtitle?: string;
   content: string;
   images: string;
   image?: string;
@@ -36,7 +36,7 @@ type Params = {
 
 type ProjectFormValues = {
   title: string;
-  description: string;
+  subtitle: string;
   content: string;
   difficult: "" | ProjectDifficulty;
   imageFile: File | null;
@@ -45,7 +45,7 @@ type ProjectFormValues = {
 
 const getInitialValues = (): ProjectFormValues => ({
   title: "",
-  description: "",
+  subtitle: "",
   content: "",
   difficult: "",
   imageFile: null,
@@ -54,7 +54,7 @@ const getInitialValues = (): ProjectFormValues => ({
 
 const toFormValues = (project: ProjectItem): ProjectFormValues => ({
   title: project.title,
-  description: project.description ?? "",
+  subtitle: project.subtitle ?? "",
   content: project.content ?? "",
   difficult: project.difficult ?? "",
   imageFile: null,
@@ -112,11 +112,11 @@ const CreateProject = () => {
           .min(1, "Title is required")
           .required("Title is required"),
 
-        description: yup
+        subtitle: yup
           .string()
           .trim()
-          .min(1, "Description is required")
-          .required("Description is required"),
+          .min(1, "Subtitle is required")
+          .required("Subtitle is required"),
 
         content: yup
           .string()
@@ -192,7 +192,7 @@ const CreateProject = () => {
         }
 
         payload.append("title", values.title.trim());
-        payload.append("description", values.description.trim());
+        payload.append("subtitle", values.subtitle.trim());
         payload.append(
           "content",
           values.content.trim(),
@@ -203,7 +203,6 @@ const CreateProject = () => {
         if (values.imageFile instanceof File) {
           payload.append("file", values.imageFile);
         }
-
         if (isEditMode) {
           const response = await apiClient.put(
             `${EDIT_PROJECT}/${_id}`,
@@ -448,23 +447,23 @@ const CreateProject = () => {
       </div>
       <Input
         type="text"
-        name="description"
+        name="subtitle"
         inputType="textarea"
-        lable="Description"
+        lable="Subtitle"
         placeholder="Brief project description"
-        value={formik.values.description}
+        value={formik.values.subtitle}
         onChange={(value) =>
-          formik.setFieldValue("description", value)
+          formik.setFieldValue("subtitle", value)
         }
         onBlur={() =>
           formik.setFieldTouched(
-            "description",
+            "subtitle",
             true,
           )
         }
         error={
-          formik.touched.description
-            ? formik.errors.description
+          formik.touched.subtitle
+            ? formik.errors.subtitle
             : undefined
         }
       />

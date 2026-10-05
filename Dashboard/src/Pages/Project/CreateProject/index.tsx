@@ -184,7 +184,7 @@ const CreateProject = () => {
       }
       payload.append("title", formData.title);
       payload.append("subtitle", formData.subtitle);
-      payload.append("description", formData.description);
+      payload.append("content", formData.description);
       payload.append("techStack", JSON.stringify(formData.techStack.filter((item) => item.trim() !== "")));
       payload.append("liveDemoLink", formData.liveDemoLink);
       payload.append("features", JSON.stringify(formData.features.filter((item) => item.trim() !== "")));

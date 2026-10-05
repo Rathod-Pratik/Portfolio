@@ -22,6 +22,19 @@ import AboutRoutes from '@modules/About/About.routes.ts';
 import LoggerRoutes from '@modules/Logger/Logger.routes.ts';
 import NotificationRoutes from '@modules/Notification/Notification.route.ts';
 
+// Import workers for their startup side effects so every queue is processed.
+import '@modules/About/About.worker.ts';
+import '@modules/Blog/Blog.worker.ts';
+import '@modules/Contact/Contact.worker.ts';
+import '@modules/Experience/Experience.worker.ts';
+import '@modules/Expertice/Expertise.worker.ts';
+import '@modules/Hero/Hero.worker.ts';
+import '@modules/Logger/Logger.worker.ts';
+import '@modules/Notification/Notification.worker.ts';
+import '@modules/Note/Note.worker.ts';
+import '@modules/Project/Project.worker.ts';
+import '@modules/Resume/Resume.worker.ts';
+import '@modules/Skill/Skill.worker.ts';
 
 import cookieParser from "cookie-parser";
 

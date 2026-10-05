@@ -1,5 +1,6 @@
 import mongoose, { type HydratedDocument } from "mongoose";
 import type { IProject } from './Project.types.ts';
+import { is } from "zod/locales";
 
 const projectSchema = new mongoose.Schema<IProject>(
   {
@@ -22,6 +23,9 @@ const projectSchema = new mongoose.Schema<IProject>(
     content: {
       type: String,
       trim: true,
+    },
+    isDeleted: {
+      type: Boolean,
     }
   },
   { timestamps: true }

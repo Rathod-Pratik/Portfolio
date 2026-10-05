@@ -95,7 +95,9 @@ export const DeleteProject = async (
       return res.status(404).json({ success: false, message: "Project not found" });
     }
 
-    const project = await Project.findByIdAndDelete(_id);
+    const project = await Project.findByIdAndUpdate(_id, {
+      isDeleted: true
+    });
 
     if (project) {
       await incrementCacheVersion(ProjectCacheKeys.listVersion());
@@ -128,7 +130,7 @@ export const GetProject = async (req: Request, res: Response) => {
     if (limit < 1) limit = 10;
     if (limit > 100) limit = 100;
 
-    const project = await Project.find().limit(limit).skip((page - 1) * limit);
+    const project = await Project.find({ isDeleted: false }).limit(limit).skip((page - 1) * limit);
 
     if (!project) {
       await logger.warn("No projects found in database", { context: "ProjectController" });
@@ -251,7 +253,7 @@ export const GetProjectData = async (
       return res.status(400).json({ success: false, message: "_id is required" });
     }
 
-    let projectData = await Project.findById(_id);
+    let projectData = await Project.findOne({ _id, isDeleted: false });
     if (!projectData) {
       await logger.warn(`GetProjectData: Not found for ID: ${_id}`, { context: "ProjectController" });
       return res.status(404).json({ success: false, message: "Project not found" });

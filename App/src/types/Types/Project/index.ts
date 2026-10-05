@@ -1,18 +1,12 @@
-type ProjectDifficulty = "Easy" | "Medium" | "Hard" | "Intermediate" | "Advanced";
+type ProjectDifficulty = "Easy" | "Medium" | "Hard";
 type ProjectDifficultyOption = "" | ProjectDifficulty;
 
 type ProjectItem = {
 	_id: string;
 	title: string;
-	subtitle?: string;
-	description: string;
-	images: string;
-	image?: string;
+	subtitle: string;
+	image: string;
 	difficult?: ProjectDifficulty;
-	liveDemoLink?: string;
-	techStack?: string[];
-	features?: string[];
-	note?: string;
 };
 
 type ProjectFormData = {
@@ -32,10 +26,6 @@ type CreateOrUpdateProjectPayload = {
 	_id?: string;
 	title: string;
 	subtitle: string;
-	description: string;
-	techStack: string[];
-	liveDemoLink: string;
-	features: string[];
 	images: string;
 	difficult: ProjectDifficultyOption;
 };

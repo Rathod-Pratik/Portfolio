@@ -10,11 +10,6 @@ export const CreateProjectSchema = z.object({
         .string()
         .trim()
         .min(1, 'Subtitle is required'),
-
-    description: z
-        .string()
-        .trim()
-        .min(1, 'Description is required'),
     content: z
         .string()
         .trim()

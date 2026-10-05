@@ -4,6 +4,7 @@ export interface IProject {
     difficult?: string;
     image?: string;
     content?: string;
+    isDeleted?: boolean
 }
 
 export interface ICreateProjectJob {

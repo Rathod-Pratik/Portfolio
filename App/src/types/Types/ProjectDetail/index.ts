@@ -3,14 +3,10 @@ type ProjectDetail = {
 		_id: string;
 		title: string;
 		createdAt: string;
-		images: string;
-		image?: string;
+		image: string;
 		difficult?: string;
 		subtitle?: string;
-		description: string;
-		techStack?: string[];
-		features?: string[];
-		liveDemoLink?: string;
+		content?: string;
 	};
 };
 
