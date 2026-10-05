@@ -9,14 +9,12 @@ import { GET_PROJECT } from '@/utils/constants';
 import type { GetProjectResponse, ProjectDetail } from '@/types';
 import { Loading } from '@/components';
 import { motion } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
 
 export default function ProjectDetailsPage() {
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
-  
+
   const [project, setProject] = useState<ProjectDetail['data'] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -77,23 +75,20 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
         )}
-        
+
         <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-white">{project.title}</h1>
-        
+
         {project.subtitle && (
           <p className="text-xl text-gray-600 dark:text-gray-400 mb-4">{project.subtitle}</p>
         )}
-        
+
         {project.createdAt && (
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-8">
             {new Date(project.createdAt).toLocaleDateString()}
           </p>
         )}
- <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-            {project.content}
-        </ReactMarkdown>
+        <div dangerouslySetInnerHTML={{ __html: project.content ?? '' }} />
 
-       
       </motion.div>
     </main>
   );
