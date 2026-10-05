@@ -56,8 +56,22 @@ const Login = () => {
 
                 if (response.status === 200) {
                     const { token, user } = response.data;
+
+                    if (!token || !user) {
+                        throw new Error("The login response was incomplete.");
+                    }
+
                     sessionStorage.setItem("token", token);
                     sessionStorage.setItem("user", JSON.stringify(user));
+                    document.cookie = [
+                        `admin=${encodeURIComponent(token)}`,
+                        "path=/",
+                        "max-age=86400",
+                        window.location.protocol === "https:" ? "secure" : "",
+                        "samesite=lax",
+                    ]
+                        .filter(Boolean)
+                        .join("; ");
                     toast.success("Login successful");
                     router.replace("/Dashboard");
                 }
@@ -78,7 +92,15 @@ const Login = () => {
     return (
         <div className="min-h-[80vh] flex items-center justify-center px-2 sm:px-6 lg:px-8">
             <div className="relative shadow-xl rounded-2xl overflow-hidden w-full max-w-4xl flex flex-col lg:flex-row bg-[#111827] border border-gray-800">
-                {formik.isSubmitting && <Loading />}
+                {formik.isSubmitting && (
+                    <div
+                        className="absolute inset-0 z-10 flex items-center justify-center bg-[#111827]/80"
+                        aria-live="polite"
+                        aria-label="Signing in"
+                    >
+                        <Loading className="min-h-0" />
+                    </div>
+                )}
 
                 <div className="lg:w-1/2 hidden md:flex items-center justify-center p-6 sm:p-12">
                     <div className="text-center text-white">
