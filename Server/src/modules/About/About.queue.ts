@@ -3,6 +3,7 @@ import { bellmqConnection } from "@config/redis.ts";
 export const aboutQueue = new Queue('about',
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
         defaultJobOptions: {
             attempts: 3,
             backoff: {

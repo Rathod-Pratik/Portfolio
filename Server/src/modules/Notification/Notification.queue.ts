@@ -9,6 +9,7 @@ export const notificationQueue =
         NOTIFICATION_QUEUE_NAME,
         {
             connection: bellmqConnection,
+            skipVersionCheck: true,
             defaultJobOptions: {
                 attempts: 3,
                 backoff: {

@@ -65,6 +65,7 @@ export const contactWorker = new Worker<ICreateContactJob>(
     },
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
         concurrency: 1,
     }
 );

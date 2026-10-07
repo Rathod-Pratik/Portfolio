@@ -26,6 +26,7 @@ export const loggerWorker = new Worker<ILoggerJob>(
   },
   {
     connection: bellmqConnection,
+    skipVersionCheck: true,
     concurrency: 5,
   }
 );

@@ -12,6 +12,7 @@ export const contactQueue = new Queue<ICreateContactJob>(
     'contact',
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
         defaultJobOptions: {
             attempts: 3,
             backoff: {

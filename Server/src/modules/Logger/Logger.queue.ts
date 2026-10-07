@@ -4,6 +4,7 @@ import type { ILoggerJob } from "./Logger.types.ts";
 
 export const loggerQueue = new Queue<ILoggerJob>("logger", {
   connection: bellmqConnection,
+  skipVersionCheck: true,
   defaultJobOptions: {
     attempts: 3,
     backoff: {

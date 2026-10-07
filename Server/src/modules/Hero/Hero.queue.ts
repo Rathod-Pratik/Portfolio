@@ -9,6 +9,7 @@ export const heroQueue =
         HERO_QUEUE_NAME,
         {
             connection: bellmqConnection,
+            skipVersionCheck: true,
             defaultJobOptions: {
                 attempts: 3,
                 backoff: {

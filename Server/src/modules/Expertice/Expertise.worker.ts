@@ -71,6 +71,7 @@ export const expertiseWorker =
         },
         {
             connection: bellmqConnection,
+            skipVersionCheck: true,
             concurrency: 5,
         }
     );

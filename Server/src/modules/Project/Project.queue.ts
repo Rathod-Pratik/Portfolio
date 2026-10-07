@@ -11,6 +11,7 @@ export const projectQueue = new Queue(
     PROJECT_QUEUE_NAME,
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
         defaultJobOptions: {
             attempts: 3,
             backoff: {

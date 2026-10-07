@@ -8,6 +8,7 @@ export const experienceQueue = new Queue<IExperienceJob>(
     EXPERIENCE_QUEUE_NAME,
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
         defaultJobOptions: {
             attempts: 3,
             backoff: {

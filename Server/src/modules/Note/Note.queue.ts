@@ -8,6 +8,7 @@ export const noteQueue = new Queue<INoteJob>(
     NOTE_QUEUE_NAME,
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
         defaultJobOptions: {
             attempts: 3,
             backoff: {

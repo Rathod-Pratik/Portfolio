@@ -97,6 +97,7 @@ export const blogWorker = new Worker<IBlogCacheJob>(
     },
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
         concurrency: 1,
     }
 );

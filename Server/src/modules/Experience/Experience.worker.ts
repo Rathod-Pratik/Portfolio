@@ -75,6 +75,7 @@ export const experienceWorker = new Worker<IExperienceJob>(
     },
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
         concurrency: 5,
     }
 );

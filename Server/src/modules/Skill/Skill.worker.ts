@@ -66,6 +66,7 @@ export const skillWorker = new Worker<ISkillJob>(
     },
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
     }
 );
 

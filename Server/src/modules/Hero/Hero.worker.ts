@@ -46,6 +46,7 @@ export const heroWorker =
         },
         {
             connection: bellmqConnection,
+            skipVersionCheck: true,
             concurrency: 5,
         }
     );

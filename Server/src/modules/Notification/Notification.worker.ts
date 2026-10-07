@@ -31,6 +31,7 @@ export const notificationWorker =
         },
         {
             connection: bellmqConnection,
+            skipVersionCheck: true,
             concurrency: 5,
         }
     );

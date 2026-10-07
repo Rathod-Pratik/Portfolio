@@ -59,6 +59,7 @@ export const projectWorker = new Worker<IProjectJob>(
     },
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
     }
 );
 

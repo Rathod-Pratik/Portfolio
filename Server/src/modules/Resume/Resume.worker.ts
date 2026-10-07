@@ -62,6 +62,7 @@ export const resumeWorker = new Worker<IResumeJob>(
     },
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
     }
 );
 

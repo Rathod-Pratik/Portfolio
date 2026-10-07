@@ -33,6 +33,7 @@ export const aboutWorker = new Worker<IAboutCacheJob>(
     },
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
         concurrency: 1,
     }
 );

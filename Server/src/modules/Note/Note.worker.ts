@@ -63,6 +63,7 @@ export const noteWorker = new Worker<INoteJob>(
     },
     {
         connection: bellmqConnection,
+        skipVersionCheck: true,
         concurrency: 5,
     },
 );
