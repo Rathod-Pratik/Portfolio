@@ -1,4 +1,4 @@
-import { blogModel } from "./blog.model.ts";
+import { blogModel } from "./Blog.model.ts";
 import {
   Get_Signed_Url,
   getUploadedFile,
@@ -170,7 +170,7 @@ export const getBlogs = async (
     await setCache(
       cacheKey,
       signedBlogs,
-      600
+      60 * 60
     );
 
     await logger.info(`Fetched ${signedBlogs.length} blogs from database`, { context: "BlogController" });
@@ -247,7 +247,7 @@ export const getBlogBySlug = async (
     await setCache(
       cacheKey,
       blog,
-      600
+      60 * 60
     );
 
     await logger.info(`Fetched blog details from database for ID: ${id}`, { context: "BlogController" });

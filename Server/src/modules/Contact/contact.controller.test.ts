@@ -39,9 +39,9 @@ const {
   GetContact,
   UpdateContactStatus,
   DeleteContact,
-} = await import("./contact.controller.ts");
+} = await import("./Contact.controller.ts");
 
-const { contactModel } = await import("./contact.model.ts");
+const { contactModel } = await import("./Contact.model.ts");
 const { CreateContactJob } = await import("./Contact.queue.ts");
 const {
   getCache,

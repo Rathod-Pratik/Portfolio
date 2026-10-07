@@ -4,7 +4,7 @@ import {
     DeleteContact,
     GetContact,
     UpdateContactStatus,
-} from "./contact.controller.ts";
+} from "./Contact.controller.ts";
 import { checkAdminCookie } from "@Middleware/Auth.middleware.ts";
 import { updateAdminViews } from "@Middleware/View.middleware.ts";
 import { Validate } from "@Middleware/Validation.middleware.ts";

@@ -1,7 +1,7 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
 import { incrementCacheVersion, setCache, logger } from "@utils";
-import { contactModel } from "./contact.model.ts";
+import { contactModel } from "./Contact.model.ts";
 import {
     ContactCacheKeys,
 } from "@utils";
@@ -85,4 +85,4 @@ contactWorker.on("error", (error) => {
         "Contact worker error",
         error instanceof Error ? error : { context: "ContactWorker", metadata: { error: String(error) } }
     );
-});
+});

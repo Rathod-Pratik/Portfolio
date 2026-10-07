@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { HeroModel } from "./hero.model.ts";
+import { HeroModel } from "./Hero.model.ts";
 import {
     incrementCacheVersion,
     HeroCacheKeys,

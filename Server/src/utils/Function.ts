@@ -45,7 +45,10 @@ const allowedTypes = [
 export interface GetSignedUrlType {
   key: string;
   downloadFileName?: string;
+  expiresIn?: number;
 }
+
+export const DEFAULT_SIGNED_URL_EXPIRES_IN = 3600;
 
 export type UploadImageType = {
   buffer: Buffer;
@@ -107,7 +110,11 @@ export const uploadFileToS3 = async ({
 
 
 
-export const Get_Signed_Url = async ({ key, downloadFileName }: GetSignedUrlType) => {
+export const Get_Signed_Url = async ({
+  key,
+  downloadFileName,
+  expiresIn = DEFAULT_SIGNED_URL_EXPIRES_IN,
+}: GetSignedUrlType) => {
   if (!key) {
     throw new Error("key is required");
   }
@@ -128,7 +135,7 @@ export const Get_Signed_Url = async ({ key, downloadFileName }: GetSignedUrlType
         : {}),
     }),
     {
-      expiresIn: 3600,
+      expiresIn,
     },
   );
   const url = signedUrl;

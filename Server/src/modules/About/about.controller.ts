@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { AboutModel } from "./about.model.ts";
+import { AboutModel } from "./About.model.ts";
 import { getCache, setCache, getCacheVersion, AboutCacheKeys, logger } from "@utils";
 import { addAboutCacheJob } from "./About.queue.ts";
 import { sendInfoNotification } from "@modules/Notification/Notification.service.ts";

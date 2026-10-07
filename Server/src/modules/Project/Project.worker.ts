@@ -1,7 +1,7 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
 import { ProjectCacheKeys, incrementCacheVersion, logger } from "@utils";
-import { Project } from "./project.model.ts";
+import { Project } from "./Project.model.ts";
 import type { IProjectJob } from "./Project.types.ts";
 
 export const projectWorker = new Worker<IProjectJob>(

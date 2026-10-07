@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { NoteModel } from "./note.model.ts";
+import { NoteModel } from "./Note.model.ts";
 import {
     addCreateNoteJob,
     addUpdateNoteJob,
@@ -218,7 +218,7 @@ export const GetNote = async (
         await setCache(
             cacheKey,
             response,
-            600,
+            60 * 60,
         );
 
         await logger.info(`Fetched ${data.length} notes from database`, { context: "NoteController" });
@@ -330,7 +330,7 @@ export const GetNoteById = async (
         await setCache(
             cacheKey,
             data,
-            600,
+            60 * 60,
         );
 
         await logger.info(`Fetched note from database for ID: ${_id}`, { context: "NoteController" });

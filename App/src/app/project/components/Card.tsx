@@ -37,7 +37,7 @@ const Card = ({ item, routerPush }: ProjectCardExtraProps) => {
 
                
 
-                <span className="text-sm text-gray-500 dark:text-gray-400 text-justify">
+                <span className="py-2 text-sm text-gray-500 dark:text-gray-400 text-center">
                     {item.subtitle.length > 125 ? `${item.subtitle.slice(0, 105)}...` : item.subtitle}
                 </span>
 

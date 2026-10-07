@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { ExpertiseModel } from "./expertise.model.ts";
+import { ExpertiseModel } from "./Expertise.model.ts";
 import {
     Get_Signed_Url,
     uploadFileToS3,
@@ -153,7 +153,8 @@ export const getExpertise = async (
 
         await setCache(
             cacheKey,
-            signedExpertise
+            signedExpertise,
+            60 * 60
         );
 
         await logger.info(`Fetched ${expertise.length} expertise from database`, { context: "ExpertiseController" });
@@ -236,7 +237,8 @@ export const getExpertiseById = async (
 
         await setCache(
             cacheKey,
-            expertise
+            expertise,
+            60 * 60
         );
 
         await logger.info(`Fetched expertise from database for ID: ${id}`, { context: "ExpertiseController" });

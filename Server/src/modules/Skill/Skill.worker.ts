@@ -5,7 +5,7 @@ import {
     incrementCacheVersion,
     logger,
 } from "@utils";
-import { SkillsModel } from "./skills.model.ts";
+import { SkillsModel } from "./Skills.model.ts";
 import type { ISkillJob } from "./Skill.types.ts";
 
 export const skillWorker = new Worker<ISkillJob>(

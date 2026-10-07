@@ -15,8 +15,6 @@ const Contact = () => {
     message: "",
     email: "",
     mobile: "",
-    projectType: "",
-    budget: "",
   });
 
 
@@ -35,9 +33,7 @@ const Contact = () => {
       name: "",
       message: "",
       email: "",
-      mobile: "",
-      projectType: "",
-      budget: "",
+      mobile: ""
     });
   };
 
@@ -103,28 +99,6 @@ const Contact = () => {
                   onChange={handleInputChange}
                   className="w-full p-3 border border-gray-300 rounded bg-transparent outline-none focus:ring-2 focus:ring-purple-500"
                   aria-label="Email"
-                />
-
-                <input
-                  required
-                  type="text"
-                  id="projectType"
-                  placeholder="Project type"
-                  value={formData.projectType}
-                  onChange={handleInputChange}
-                  className="w-full p-3 border border-gray-300 rounded bg-transparent outline-none focus:ring-2 focus:ring-purple-500"
-                  aria-label="Project type"
-                />
-
-                <input
-                  required
-                  type="text"
-                  id="budget"
-                  placeholder="Budget"
-                  value={formData.budget}
-                  onChange={handleInputChange}
-                  className="w-full p-3 border border-gray-300 rounded bg-transparent outline-none focus:ring-2 focus:ring-purple-500"
-                  aria-label="Budget"
                 />
 
                 {/* Phone Field */}

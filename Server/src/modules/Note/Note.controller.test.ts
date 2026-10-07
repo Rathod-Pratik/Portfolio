@@ -62,7 +62,7 @@ const {
   DeleteNote,
 } = await import("./Note.controller.ts");
 
-const { NoteModel } = await import("./note.model.ts");
+const { NoteModel } = await import("./Note.model.ts");
 const { addCreateNoteJob, addUpdateNoteJob } = await import("./Note.queue.ts");
 const {
   Get_Signed_Url,

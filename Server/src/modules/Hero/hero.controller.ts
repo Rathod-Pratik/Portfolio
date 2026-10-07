@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { HeroModel } from "./hero.model.ts";
+import { HeroModel } from "./Hero.model.ts";
 import {
     getCache,
     setCache,
@@ -56,6 +56,7 @@ export const getHero = async (
         if (hero.image) {
             hero.image = await Get_Signed_Url({
                 key: hero.image,
+                expiresIn: 60 * 60 * 24,
             });
         }
 

@@ -43,7 +43,7 @@ const {
   GetProjectData,
 } = await import("./Project.controller.ts");
 
-const { Project } = await import("./project.model.ts");
+const { Project } = await import("./Project.model.ts");
 const { addCreateProjectJob, addUpdateProjectJob } = await import("./Project.queue.ts");
 const {
   Get_Signed_Url,

@@ -1,4 +1,4 @@
-import { ImageFileSchema } from "src/utils/Function.ts";
+import { ImageFileSchema } from "../../utils/Function.ts";
 import { z } from "zod";
 
 const booleanFromFormData = z.preprocess(

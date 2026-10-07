@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { contactModel } from "./contact.model.ts";
+import { contactModel } from "./Contact.model.ts";
 
 import {
   getCache,
@@ -263,4 +263,4 @@ export const DeleteContact = async (
       message: error instanceof Error ? error.message : String(error),
     });
   }
-};
+};

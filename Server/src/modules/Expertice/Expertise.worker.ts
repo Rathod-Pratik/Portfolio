@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { ExpertiseModel } from "./expertise.model.ts";
+import { ExpertiseModel } from "./Expertise.model.ts";
 import {
     incrementCacheVersion,
     ExpertiseCacheKeys,

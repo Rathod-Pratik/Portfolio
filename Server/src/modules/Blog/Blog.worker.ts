@@ -5,7 +5,7 @@ import {
     incrementCacheVersion,
     logger,
 } from "@utils";
-import { blogModel } from "./blog.model.ts";
+import { blogModel } from "./Blog.model.ts";
 import type {
     IBlogCacheJob,
 } from "./Blog.queue.ts";

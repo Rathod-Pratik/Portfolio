@@ -42,8 +42,8 @@ jest.unstable_mockModule("@utils", () => ({
   },
 }));
 
-const { getHero, updateHero } = await import("./hero.controller.ts");
-const { HeroModel } = await import("./hero.model.ts");
+const { getHero, updateHero } = await import("./Hero.controller.ts");
+const { HeroModel } = await import("./Hero.model.ts");
 const { addUpdateHeroJob } = await import("./Hero.queue.ts");
 const {
   getCache,

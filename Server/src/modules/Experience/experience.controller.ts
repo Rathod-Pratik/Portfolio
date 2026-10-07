@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { ExperienceModel } from "./experience.model.ts";
+import { ExperienceModel } from "./Experience.model.ts";
 import type {
     IExperience,
 } from "./Experience.types.ts";

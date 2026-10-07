@@ -49,11 +49,11 @@ jest.unstable_mockModule("@utils", () => ({
 
 const { FetchStates, IncrementView } = await import("./Stats.controller.ts");
 const { AdminModel } = await import("../Auth/Auth.model.ts");
-const { blogModel } = await import("../Blog/blog.model.ts");
-const { NoteModel } = await import("../Note/note.model.ts");
-const { Project } = await import("../Project/project.model.ts");
-const { contactModel } = await import("../Contact/contact.model.ts");
-const { SkillsModel } = await import("../Skill/skills.model.ts");
+const { blogModel } = await import("../Blog/Blog.model.ts");
+const { NoteModel } = await import("../Note/Note.model.ts");
+const { Project } = await import("../Project/Project.model.ts");
+const { contactModel } = await import("../Contact/Contact.model.ts");
+const { SkillsModel } = await import("../Skill/Skills.model.ts");
 
 describe("Stats Controller", () => {
   beforeEach(() => {

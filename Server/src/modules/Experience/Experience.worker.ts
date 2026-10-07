@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { ExperienceModel } from "./experience.model.ts";
+import { ExperienceModel } from "./Experience.model.ts";
 import {
     incrementCacheVersion,
     ExperienceCacheKeys,

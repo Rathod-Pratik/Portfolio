@@ -3,7 +3,7 @@ import { bellmqConnection } from "@config/redis.ts";
 import { AboutCacheKeys, incrementCacheVersion, logger } from "@utils";
 
 import type { IAboutCacheJob } from "./About.types.ts";
-import { AboutModel } from "./about.model.ts";
+import { AboutModel } from "./About.model.ts";
 
 export const aboutWorker = new Worker<IAboutCacheJob>(
     "about",
