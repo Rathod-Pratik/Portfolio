@@ -1,8 +1,6 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
 import {
-    BlogCacheKeys,
-    incrementCacheVersion,
     logger,
 } from "@utils";
 import { blogModel } from "./Blog.model.ts";
@@ -50,13 +48,6 @@ export const blogWorker = new Worker<IBlogCacheJob>(
                 throw new Error("Blog not found");
             }
 
-            await incrementCacheVersion(
-                BlogCacheKeys.listVersion()
-            );
-
-            await incrementCacheVersion(
-                BlogCacheKeys.detailsVersion(_id)
-            );
 
             await sendInfoNotification(
                 "Blog Updated",
@@ -80,10 +71,6 @@ export const blogWorker = new Worker<IBlogCacheJob>(
             tags,
             isPublished: isPublished ?? false,
         });
-
-        await incrementCacheVersion(
-            BlogCacheKeys.listVersion()
-        );
 
         await sendInfoNotification(
             "Blog Created",

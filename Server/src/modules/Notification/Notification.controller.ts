@@ -1,11 +1,6 @@
 import type { Request, Response } from "express";
 import { NotificationModel } from "./Notification.model.ts";
 import {
-    getCache,
-    setCache,
-    getCacheVersion,
-    incrementCacheVersion,
-    NotificationCacheKeys,
     logger,
 } from "@utils";
 import {
@@ -21,19 +16,6 @@ export const getNotifications = async (req: Request, res: Response) => {
         const limit = queryValidation.success ? queryValidation.data.limit : 10;
         const type = queryValidation.success ? queryValidation.data.type : undefined;
         const unreadOnly = queryValidation.success ? queryValidation.data.unreadOnly : undefined;
-
-        const version = await getCacheVersion(NotificationCacheKeys.listVersion());
-        const filterKey = `${type || "all"}:${unreadOnly === true ? "unread" : "all"}`;
-        const cacheKey = `${NotificationCacheKeys.list(version, page, limit, filterKey)}`;
-
-        const cachedData = await getCache(cacheKey);
-        if (cachedData) {
-            await logger.debug("Fetched notifications from cache", { context: "NotificationController" });
-            return res.status(200).json({
-                data: cachedData,
-                source: "cache",
-            });
-        }
 
         const filter: Record<string, unknown> = { isDeleted: false };
         if (type) filter.type = type;
@@ -59,8 +41,6 @@ export const getNotifications = async (req: Request, res: Response) => {
             limit,
             totalPages: Math.ceil(total / limit),
         };
-
-        await setCache(cacheKey, result, 120);
 
         await logger.info(`Fetched ${notifications.length} notifications from database`, {
             context: "NotificationController",
@@ -95,17 +75,6 @@ export const getNotificationById = async (req: Request, res: Response) => {
         }
 
         const { id } = validation.data;
-        const version = await getCacheVersion(NotificationCacheKeys.detailsVersion(id));
-        const cacheKey = `${NotificationCacheKeys.details(id, version)}`;
-
-        const cachedNotification = await getCache(cacheKey);
-        if (cachedNotification) {
-            return res.status(200).json({
-                data: cachedNotification,
-                source: "cache",
-            });
-        }
-
         const notification = await NotificationModel.findOne({ _id: id, isDeleted: false }).lean();
         if (!notification) {
             await logger.warn(`Notification not found with ID: ${id}`, { context: "NotificationController" });
@@ -113,8 +82,6 @@ export const getNotificationById = async (req: Request, res: Response) => {
                 message: "Notification not found",
             });
         }
-
-        await setCache(cacheKey, notification, 300);
 
         return res.status(200).json({
             data: notification,
@@ -160,9 +127,6 @@ export const markAsRead = async (req: Request, res: Response) => {
             });
         }
 
-        await incrementCacheVersion(NotificationCacheKeys.listVersion());
-        await incrementCacheVersion(NotificationCacheKeys.detailsVersion(id));
-
         await logger.info(`Notification marked as read: ${id}`, { context: "NotificationController" });
 
         return res.status(200).json({
@@ -187,8 +151,6 @@ export const markAllAsRead = async (_req: Request, res: Response) => {
             { isDeleted: false, isRead: false },
             { isRead: true }
         );
-
-        await incrementCacheVersion(NotificationCacheKeys.listVersion());
 
         await logger.info("All notifications marked as read", { context: "NotificationController" });
 
@@ -236,9 +198,6 @@ export const deleteNotification = async (req: Request, res: Response) => {
             });
         }
 
-        await incrementCacheVersion(NotificationCacheKeys.listVersion());
-        await incrementCacheVersion(NotificationCacheKeys.detailsVersion(id));
-
         await logger.info(`Notification deleted: ${id}`, { context: "NotificationController" });
 
         return res.status(200).json({
@@ -262,8 +221,6 @@ export const clearAllNotifications = async (_req: Request, res: Response) => {
             { isDeleted: false },
             { isDeleted: true }
         );
-
-        await incrementCacheVersion(NotificationCacheKeys.listVersion());
 
         await logger.info("All notifications cleared successfully", { context: "NotificationController" });
 

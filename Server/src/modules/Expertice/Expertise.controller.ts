@@ -3,11 +3,6 @@ import { ExpertiseModel } from "./Expertise.model.ts";
 import {
     Get_Signed_Url,
     uploadFileToS3,
-    getCache,
-    setCache,
-    getCacheVersion,
-    incrementCacheVersion,
-    ExpertiseCacheKeys,
     uploadWithRetry,
     getUploadedFile,
     logger,
@@ -108,29 +103,6 @@ export const getExpertise = async (
 
         const limit = Number(req.query.limit) || 10;
 
-        const version =
-            await getCacheVersion(
-                ExpertiseCacheKeys.listVersion()
-            );
-
-        const cacheKey =
-            ExpertiseCacheKeys.list(
-                version,
-                page,
-                limit
-            );
-
-        const cachedExpertise =
-            await getCache(cacheKey);
-
-        if (cachedExpertise) {
-            await logger.debug("Fetched expertise list from cache", { context: "ExpertiseController" });
-            return res.status(200).json({
-                data: cachedExpertise,
-                source: "cache",
-            });
-        }
-
         const skip =
             (page - 1) * limit;
 
@@ -150,12 +122,6 @@ export const getExpertise = async (
                         : null,
                 }))
             );
-
-        await setCache(
-            cacheKey,
-            signedExpertise,
-            60 * 60
-        );
 
         await logger.info(`Fetched ${expertise.length} expertise from database`, { context: "ExpertiseController" });
 
@@ -194,29 +160,6 @@ export const getExpertiseById = async (
         }
         const { id } = validateId.data;
 
-        const version =
-            await getCacheVersion(
-                ExpertiseCacheKeys.detailsVersion(
-                    id
-                )
-            );
-
-        const cacheKey =
-            ExpertiseCacheKeys.details(
-                id,
-                version
-            );
-
-        const cachedExpertise =
-            await getCache(cacheKey);
-
-        if (cachedExpertise) {
-            await logger.debug(`Fetched expertise from cache for ID: ${id}`, { context: "ExpertiseController" });
-            return res.status(200).json(
-                { data: cachedExpertise, source: "cache" }
-            );
-        }
-
         const expertise =
             await ExpertiseModel
                 .findOne({ _id: id, isDeleted: false })
@@ -234,12 +177,6 @@ export const getExpertiseById = async (
                 await Get_Signed_Url({ key: expertise.image });
             expertise.image = signedImageUrl;
         }
-
-        await setCache(
-            cacheKey,
-            expertise,
-            60 * 60
-        );
 
         await logger.info(`Fetched expertise from database for ID: ${id}`, { context: "ExpertiseController" });
 
@@ -392,13 +329,6 @@ export const deleteExpertise = async (
             });
         }
 
-        await incrementCacheVersion(
-            ExpertiseCacheKeys.listVersion()
-        );
-
-        await incrementCacheVersion(
-            ExpertiseCacheKeys.detailsVersion(id)
-        );
 
         await sendInfoNotification(
             "Expertise Deleted",

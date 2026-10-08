@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { LoggerCacheKeys, incrementCacheVersion } from "@utils";
+import { logger } from "@utils";
 import type { ILoggerJob } from "./Logger.types.ts";
 import { LoggerModel } from "./Logger.model.ts";
 
@@ -16,10 +16,6 @@ export const loggerWorker = new Worker<ILoggerJob>(
       metadata: metadata || {},
       stack,
     });
-
-    await incrementCacheVersion(
-      LoggerCacheKeys.listVersion()
-    );
 
     console.log(`Log saved with ID: ${log._id.toString()} [${level.toUpperCase()}]`);
     return log;

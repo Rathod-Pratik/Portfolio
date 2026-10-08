@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { AboutModel } from "./About.model.ts";
-import { getCache, setCache, getCacheVersion, AboutCacheKeys, logger } from "@utils";
+import { logger } from "@utils";
 import { addAboutCacheJob } from "./About.queue.ts";
 import { sendInfoNotification } from "@modules/Notification/Notification.service.ts";
 import { AboutSchema } from "./About.validation.ts";
@@ -10,23 +10,6 @@ export const getAbout = async (
   res: Response
 ) => {
   try {
-    const version = await getCacheVersion(
-      AboutCacheKeys.detailsVersion('about')
-    );
-
-    const cacheKey =
-      `${AboutCacheKeys.details('about', version)}`;
-
-    const cachedAbout =
-      await getCache(cacheKey);
-
-    if (cachedAbout) {
-      await logger.debug("Fetched About details from cache", { context: "AboutController" });
-      return res.status(200).json({
-        data: cachedAbout,
-        'source': 'cache',
-      });
-    }
 
     const about =
       await AboutModel.findOne().lean();
@@ -37,12 +20,6 @@ export const getAbout = async (
         message: "About information not found",
       });
     }
-
-    await setCache(
-      cacheKey,
-      about,
-      600
-    );
 
     await logger.info("Fetched About details from database", { context: "AboutController" });
     return res.status(200).json({

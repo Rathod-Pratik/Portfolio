@@ -1,11 +1,6 @@
 import type { Request, Response } from "express";
 import { HeroModel } from "./Hero.model.ts";
 import {
-    getCache,
-    setCache,
-    getCacheVersion,
-    HeroCacheKeys,
-    HERO_ID,
     getUploadedFile,
     Get_Signed_Url,
     uploadWithRetry,
@@ -21,27 +16,6 @@ export const getHero = async (
     res: Response
 ) => {
     try {
-        const version =
-            await getCacheVersion(
-                HeroCacheKeys.detailsVersion(HERO_ID)
-            );
-
-        const cacheKey =
-            HeroCacheKeys.details(
-                HERO_ID,
-                version
-            );
-
-        const cachedHero =
-            await getCache(cacheKey);
-
-        if (cachedHero) {
-            await logger.debug("Fetched Hero from cache", { context: "HeroController" });
-            return res.status(200).json({
-                data: cachedHero,
-                source: "cache",
-            });
-        }
 
         const hero =
             await HeroModel.findOne().lean();
@@ -59,12 +33,6 @@ export const getHero = async (
                 expiresIn: 60 * 60 * 24,
             });
         }
-
-        await setCache(
-            cacheKey,
-            hero,
-            60 * 60 * 24
-        );
 
         await logger.info("Fetched Hero from database", { context: "HeroController" });
 

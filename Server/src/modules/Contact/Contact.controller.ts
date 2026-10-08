@@ -2,11 +2,6 @@ import type { Request, Response } from "express";
 import { contactModel } from "./Contact.model.ts";
 
 import {
-  getCache,
-  incrementCacheVersion,
-  getCacheVersion,
-  ContactCacheKeys,
-  setCache,
   logger,
 } from "@utils";
 import { CreateContactJob } from "./Contact.queue.ts";
@@ -82,28 +77,6 @@ export const GetContact = async (
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
 
-    const version = await getCacheVersion(
-      ContactCacheKeys.listVersion()
-    );
-
-    const cacheKey = ContactCacheKeys.list(
-      version,
-      page,
-      limit
-    );
-
-    const cachedContacts = await getCache(
-      cacheKey
-    );
-
-    if (cachedContacts) {
-      await logger.debug("Fetched contacts from cache", { context: "ContactController" });
-      return res.status(200).json({
-        data: cachedContacts,
-        source: "cache",
-      });
-    }
-
     const skip = (page - 1) * limit;
 
     const contacts = await contactModel
@@ -112,12 +85,6 @@ export const GetContact = async (
       .skip(skip)
       .limit(limit)
       .lean();
-
-    await setCache(
-      cacheKey,
-      contacts,
-      60 * 60
-    );
 
     await logger.info(`Fetched ${contacts.length} contacts from database`, { context: "ContactController" });
     
@@ -169,10 +136,6 @@ export const UpdateContactStatus = async (
         message: "Contact not found",
       });
     }
-
-    await incrementCacheVersion(
-      ContactCacheKeys.listVersion()
-    );
 
     await sendInfoNotification(
       "Contact Status Updated",
@@ -232,10 +195,6 @@ export const DeleteContact = async (
         message: "Contact not found",
       });
     }
-
-    await incrementCacheVersion(
-      ContactCacheKeys.listVersion()
-    );
 
     await sendInfoNotification(
       "Contact Deleted",

@@ -2,8 +2,6 @@ import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
 import { ExpertiseModel } from "./Expertise.model.ts";
 import {
-    incrementCacheVersion,
-    ExpertiseCacheKeys,
     logger,
 } from "@utils";
 import type { IExpertiseJob } from "./Expertise.types.ts";
@@ -17,10 +15,6 @@ export const expertiseWorker =
                     await ExpertiseModel.create(
                         job.data.data
                     );
-
-                await incrementCacheVersion(
-                    ExpertiseCacheKeys.listVersion()
-                );
 
                 await logger.info(`Expertise created in DB: ${expertise.title}`, {
                     context: "ExpertiseWorker",
@@ -52,15 +46,6 @@ export const expertiseWorker =
                 );
             }
 
-            await incrementCacheVersion(
-                ExpertiseCacheKeys.listVersion()
-            );
-
-            await incrementCacheVersion(
-                ExpertiseCacheKeys.detailsVersion(
-                    expertiseId
-                )
-            );
 
             await logger.info(`Expertise updated in DB for ID: ${expertiseId}`, {
                 context: "ExpertiseWorker",

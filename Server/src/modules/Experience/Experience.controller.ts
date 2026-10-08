@@ -4,11 +4,6 @@ import type {
     IExperience,
 } from "./Experience.types.ts";
 import {
-    getCache,
-    setCache,
-    getCacheVersion,
-    incrementCacheVersion,
-    ExperienceCacheKeys,
     logger,
 } from "@utils";
 import {
@@ -89,29 +84,6 @@ export const getExperiences = async (
         if (limit < 1) limit = 10;
         if (limit > 100) limit = 100;
 
-        const version =
-            await getCacheVersion(
-                ExperienceCacheKeys.listVersion()
-            );
-
-        const cacheKey =
-            ExperienceCacheKeys.list(
-                version,
-                page,
-                limit
-            );
-
-        const cachedExperiences =
-            await getCache(cacheKey);
-
-        if (cachedExperiences) {
-            await logger.debug("Fetched experiences from cache", { context: "ExperienceController" });
-            return res.status(200).json({
-                data: cachedExperiences,
-                source: "cache",
-            });
-        }
-
         const skip = (page - 1) * limit;
 
         const experiences =
@@ -120,11 +92,6 @@ export const getExperiences = async (
                 .skip(skip)
                 .limit(limit)
                 .lean();
-
-        await setCache(
-            cacheKey,
-            experiences
-        );
 
         await logger.info(`Fetched ${experiences.length} experiences from database`, { context: "ExperienceController" });
 
@@ -160,28 +127,6 @@ export const getExperienceById = async (
         }
         const { id } = validate.data;
 
-        const version =
-            await getCacheVersion(
-                ExperienceCacheKeys.detailsVersion(id as string)
-            );
-
-        const cacheKey =
-            ExperienceCacheKeys.details(
-                id as string,
-                version
-            );
-
-        const cachedExperience =
-            await getCache(cacheKey);
-
-        if (cachedExperience) {
-            await logger.debug(`Fetched experience from cache for ID: ${id}`, { context: "ExperienceController" });
-            return res.status(200).json({
-                data: cachedExperience,
-                source: "cache"
-            });
-        }
-
         const experience =
             await ExperienceModel.findOne({ _id: id, isDeleted: false }).lean();
 
@@ -191,11 +136,6 @@ export const getExperienceById = async (
                 message: "Experience not found",
             });
         }
-
-        await setCache(
-            cacheKey,
-            experience
-        );
 
         await logger.info(`Fetched experience from database for ID: ${id}`, { context: "ExperienceController" });
 
@@ -322,13 +262,6 @@ export const deleteExperience = async (
             });
         }
 
-        await incrementCacheVersion(
-            ExperienceCacheKeys.listVersion()
-        );
-
-        await incrementCacheVersion(
-            ExperienceCacheKeys.detailsVersion(id as string)
-        );
 
         await sendInfoNotification(
             "Experience Deleted",

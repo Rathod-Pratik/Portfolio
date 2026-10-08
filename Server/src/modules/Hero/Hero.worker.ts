@@ -2,9 +2,6 @@ import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
 import { HeroModel } from "./Hero.model.ts";
 import {
-    incrementCacheVersion,
-    HeroCacheKeys,
-    HERO_ID,
     logger,
 } from "@utils";
 import type { IHeroJob } from "./Hero.types.ts";
@@ -27,10 +24,6 @@ export const heroWorker =
                         runValidators: true,
                     }
                 );
-
-            await incrementCacheVersion(
-                HeroCacheKeys.detailsVersion(HERO_ID)
-            );
 
             await sendInfoNotification(
                 "Hero Update",

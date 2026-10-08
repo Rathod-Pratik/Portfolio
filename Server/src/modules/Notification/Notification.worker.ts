@@ -2,7 +2,7 @@ import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
 import type { INotificationJob } from "./Notification.types.ts";
 import { NotificationModel } from "./Notification.model.ts";
-import { incrementCacheVersion, NotificationCacheKeys, logger } from "@utils";
+import { logger } from "@utils";
 
 export const notificationWorker =
     new Worker<INotificationJob>(
@@ -19,8 +19,6 @@ export const notificationWorker =
                 isRead: false,
                 isDeleted: false,
             });
-
-            await incrementCacheVersion(NotificationCacheKeys.listVersion());
 
             await logger.info(`Notification saved to database: ${notification.title}`, {
                 context: "NotificationWorker",

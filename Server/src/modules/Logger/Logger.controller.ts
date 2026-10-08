@@ -2,7 +2,6 @@ import type { Request, Response } from "express";
 import { LoggerModel } from "./Logger.model.ts";
 import { addLogJob } from "./Logger.queue.ts";
 import { CreateLoggerSchema, LoggerIdSchema, LoggerQuerySchema } from "./Logger.validation.ts";
-import { getCache, setCache, getCacheVersion, LoggerCacheKeys, incrementCacheVersion } from "@utils";
 
 export const getLogs = async (req: Request, res: Response) => {
   try {
@@ -12,18 +11,6 @@ export const getLogs = async (req: Request, res: Response) => {
     const limit = queryValidation.success ? queryValidation.data.limit : 10;
     const level = queryValidation.success ? queryValidation.data.level : undefined;
     const context = queryValidation.success ? queryValidation.data.context : undefined;
-
-    const version = await getCacheVersion(LoggerCacheKeys.listVersion());
-    const filterKey = `${level || "all"}:${context || "all"}`;
-    const cacheKey = `${LoggerCacheKeys.list(version, page, limit, filterKey)}`;
-
-    const cachedLogs = await getCache(cacheKey);
-    if (cachedLogs) {
-      return res.status(200).json({
-        data: cachedLogs,
-        source: "cache",
-      });
-    }
 
     const filter: Record<string, unknown> = {};
     if (level) filter.level = level;
@@ -48,8 +35,6 @@ export const getLogs = async (req: Request, res: Response) => {
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, result, 300);
-
     return res.status(200).json({
       data: result,
       source: "database",
@@ -72,16 +57,6 @@ export const getLogById = async (req: Request, res: Response) => {
     }
 
     const { id } = validation.data;
-    const version = await getCacheVersion(LoggerCacheKeys.detailsVersion(id));
-    const cacheKey = `${LoggerCacheKeys.details(id, version)}`;
-
-    const cachedLog = await getCache(cacheKey);
-    if (cachedLog) {
-      return res.status(200).json({
-        data: cachedLog,
-        source: "cache",
-      });
-    }
 
     const log = await LoggerModel.findById(id).lean();
     if (!log) {
@@ -89,8 +64,6 @@ export const getLogById = async (req: Request, res: Response) => {
         message: "Log entry not found",
       });
     }
-
-    await setCache(cacheKey, log, 600);
 
     return res.status(200).json({
       data: log,
@@ -154,9 +127,6 @@ export const deleteLog = async (req: Request, res: Response) => {
       });
     }
 
-    await incrementCacheVersion(LoggerCacheKeys.listVersion());
-    await incrementCacheVersion(LoggerCacheKeys.detailsVersion(id));
-
     return res.status(200).json({
       message: "Log deleted successfully",
     });
@@ -171,8 +141,6 @@ export const deleteLog = async (req: Request, res: Response) => {
 export const clearLogs = async (req: Request, res: Response) => {
   try {
     await LoggerModel.deleteMany({});
-    await incrementCacheVersion(LoggerCacheKeys.listVersion());
-
     return res.status(200).json({
       message: "All logs cleared successfully",
     });

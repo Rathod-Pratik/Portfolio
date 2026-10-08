@@ -1,10 +1,7 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { incrementCacheVersion, setCache, logger } from "@utils";
+import { logger } from "@utils";
 import { contactModel } from "./Contact.model.ts";
-import {
-    ContactCacheKeys,
-} from "@utils";
 import type { ICreateContactJob } from "./Contact.queue.ts";
 import { sendInfoNotification } from "@modules/Notification/Notification.index.ts";
 import nodemailer from "nodemailer";
@@ -25,10 +22,6 @@ export const contactWorker = new Worker<ICreateContactJob>(
             await logger.error("Failed to create contact in database", { context: "ContactWorker" });
             throw new Error("Failed to create contact");
         }
-
-        await incrementCacheVersion(
-            ContactCacheKeys.listVersion()
-        );
 
         await sendInfoNotification(
             "New Contact",

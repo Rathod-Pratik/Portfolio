@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { ResumeCacheKeys, incrementCacheVersion, logger } from "@utils";
+import { logger } from "@utils";
 import { CVmodel } from "./Resume.model.ts";
 import type { IResumeJob } from "./Resume.types.ts";
 
@@ -10,10 +10,6 @@ export const resumeWorker = new Worker<IResumeJob>(
         switch (job.data.type) {
             case "create": {
                 const cv = await CVmodel.create(job.data.data);
-
-                await incrementCacheVersion(
-                    ResumeCacheKeys.listVersion()
-                );
 
                 await logger.info(`CV created in DB with ID: ${cv._id.toString()}`, {
                     context: "ResumeWorker",
@@ -37,16 +33,6 @@ export const resumeWorker = new Worker<IResumeJob>(
                     await logger.warn(`Resume worker update failed: ID not found: ${job.data.resumeId}`, { context: "ResumeWorker" });
                     throw new Error("Resume not found");
                 }
-
-                await incrementCacheVersion(
-                    ResumeCacheKeys.listVersion()
-                );
-
-                await incrementCacheVersion(
-                    ResumeCacheKeys.detailsVersion(
-                        job.data.resumeId
-                    )
-                );
 
                 await logger.info(`CV updated in DB for ID: ${job.data.resumeId}`, {
                     context: "ResumeWorker",
@@ -75,4 +61,4 @@ resumeWorker.on("failed", (job, error) => {
         `Resume job failed: ${job?.id}`,
         error instanceof Error ? error : { context: "ResumeWorker", metadata: { jobId: job?.id, error: String(error) } }
     );
-});
+});

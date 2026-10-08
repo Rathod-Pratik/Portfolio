@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
-import { AboutCacheKeys, incrementCacheVersion, logger } from "@utils";
+import { logger } from "@utils";
 
 import type { IAboutCacheJob } from "./About.types.ts";
 import { AboutModel } from "./About.model.ts";
@@ -22,9 +22,6 @@ export const aboutWorker = new Worker<IAboutCacheJob>(
 
             await about.save();
         }
-        await incrementCacheVersion(
-            AboutCacheKeys.detailsVersion('about')
-        );
 
         await logger.info(
             `About cache and database updated for ID: ${about._id.toString()}`,

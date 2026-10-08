@@ -1,8 +1,6 @@
 import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
 import {
-    incrementCacheVersion,
-    NoteCacheKeys,
     logger,
 } from "@utils";
 import { NOTE_QUEUE_NAME } from "./Note.queue.ts";
@@ -15,10 +13,6 @@ export const noteWorker = new Worker<INoteJob>(
         if (job.data.type === "create") {
             const note = await NoteModel.create(
                 job.data.data,
-            );
-
-            await incrementCacheVersion(
-                NoteCacheKeys.listVersion(),
             );
 
             await logger.info(`Note created in DB: ${note.title}`, {
@@ -44,15 +38,6 @@ export const noteWorker = new Worker<INoteJob>(
             throw new Error("Note not found");
         }
 
-        await incrementCacheVersion(
-            NoteCacheKeys.listVersion(),
-        );
-
-        await incrementCacheVersion(
-            NoteCacheKeys.detailsVersion(
-                job.data.noteId,
-            ),
-        );
 
         await logger.info(`Note updated in DB for ID: ${job.data.noteId}`, {
             context: "NoteWorker",

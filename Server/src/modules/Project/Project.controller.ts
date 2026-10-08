@@ -1,5 +1,5 @@
 import { Project } from './Project.model.ts';
-import { Get_Signed_Url, getUploadedFile, uploadFileToS3, logger, incrementCacheVersion, ProjectCacheKeys } from '@utils';
+import { Get_Signed_Url, getUploadedFile, uploadFileToS3, logger } from '@utils';
 import type { Request, Response } from 'express';
 import { CreateProjectSchema, EditProjectSchema } from './Project.validation.ts';
 import { addCreateProjectJob, addUpdateProjectJob } from './Project.queue.ts';
@@ -100,8 +100,6 @@ export const DeleteProject = async (
     });
 
     if (project) {
-      await incrementCacheVersion(ProjectCacheKeys.listVersion());
-      await incrementCacheVersion(ProjectCacheKeys.detailsVersion(_id as string));
       await logger.info(`Project deleted successfully: ${projectData.title} (ID: ${_id})`, { context: "ProjectController" });
       return res
         .status(200)

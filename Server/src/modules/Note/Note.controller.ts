@@ -11,12 +11,7 @@ import {
 } from "./Note.validation.ts";
 import {
     Get_Signed_Url,
-    getCache,
-    getCacheVersion,
-    setCache,
     uploadFileToS3,
-    NoteCacheKeys,
-    incrementCacheVersion,
     getFiles,
     uploadWithRetry,
     ImageFileSchema,
@@ -142,29 +137,6 @@ export const GetNote = async (
             100,
         );
 
-        const version =
-            await getCacheVersion(
-                NoteCacheKeys.listVersion(),
-            );
-
-        const cacheKey =
-            NoteCacheKeys.list(
-                version,
-                page,
-                limit,
-            );
-
-        const cached =
-            await getCache(cacheKey);
-
-        if (cached) {
-            await logger.debug("Fetched notes from cache", { context: "NoteController" });
-            return res.status(200).json({
-                success: true,
-                data: cached,
-            });
-        }
-
         const skip = (page - 1) * limit;
 
         const [notes, total] =
@@ -215,12 +187,6 @@ export const GetNote = async (
             ),
         };
 
-        await setCache(
-            cacheKey,
-            response,
-            60 * 60,
-        );
-
         await logger.info(`Fetched ${data.length} notes from database`, { context: "NoteController" });
 
         return res.status(200).json({
@@ -266,30 +232,6 @@ export const GetNoteById = async (
 
         const { _id } = validation.data;
 
-        const version =
-            await getCacheVersion(
-                NoteCacheKeys.detailsVersion(
-                    _id,
-                ),
-            );
-
-        const cacheKey =
-            NoteCacheKeys.details(
-                _id,
-                version,
-            );
-
-        const cached =
-            await getCache(cacheKey);
-
-        if (cached) {
-            await logger.debug(`Fetched note from cache for ID: ${_id}`, { context: "NoteController" });
-            return res.status(200).json({
-                success: true,
-                data: cached,
-            });
-        }
-
         const note =
             await NoteModel.findById(
                 _id,
@@ -326,12 +268,6 @@ export const GetNoteById = async (
             note_image_url: image,
             note_pdf_url: pdf,
         };
-
-        await setCache(
-            cacheKey,
-            data,
-            60 * 60,
-        );
 
         await logger.info(`Fetched note from database for ID: ${_id}`, { context: "NoteController" });
 
@@ -510,15 +446,6 @@ export const DeleteNote = async (
             _id,
         );
 
-        await incrementCacheVersion(
-            NoteCacheKeys.listVersion(),
-        );
-
-        await incrementCacheVersion(
-            NoteCacheKeys.detailsVersion(
-                _id,
-            ),
-        );
 
         await sendInfoNotification(
             "Note Deleted",

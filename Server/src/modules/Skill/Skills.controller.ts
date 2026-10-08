@@ -9,11 +9,6 @@ import {
     addUpdateSkillJob,
 } from "./Skill.queue.ts";
 import {
-    getCache,
-    setCache,
-    SkillCacheKeys,
-    getCacheVersion,
-    incrementCacheVersion,
     logger,
 } from "@utils";
 import {
@@ -173,13 +168,6 @@ export const DeleteSkill = async (
             });
         }
 
-        await incrementCacheVersion(
-            SkillCacheKeys.listVersion()
-        );
-
-        await incrementCacheVersion(
-            SkillCacheKeys.detailsVersion(_id as string)
-        );
 
         await logger.info(`Skill deleted successfully: ${skill.language} (ID: ${_id})`, { context: "SkillController" });
 
@@ -219,35 +207,9 @@ export const GetSkill = async (
             limit = 100;
         }
 
-        const version = await getCacheVersion(
-            SkillCacheKeys.listVersion()
-        );
-
-        const cacheKey = SkillCacheKeys.list(
-            version,
-            page,
-            limit
-        );
-
-        const cachedSkills =
-            await getCache(cacheKey);
-
-        if (cachedSkills !== null) {
-            await logger.debug("Fetched skills from cache", { context: "SkillController" });
-            return res.status(200).json({
-                success: true,
-                data: cachedSkills,
-            });
-        }
-
         const skills = await SkillsModel.find()
             .limit(limit)
             .skip((page - 1) * limit);
-
-        await setCache(
-            cacheKey,
-            skills
-        );
 
         await logger.info(`Fetched ${skills.length} skills from database`, { context: "SkillController" });
 

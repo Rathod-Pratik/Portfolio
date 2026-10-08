@@ -2,11 +2,6 @@ import { blogModel } from "./Blog.model.ts";
 import {
   Get_Signed_Url,
   getUploadedFile,
-  getCache,
-  getCacheVersion,
-  incrementCacheVersion,
-  BlogCacheKeys,
-  setCache,
   uploadWithRetry,
   ImageFileSchema,
   logger,
@@ -124,29 +119,6 @@ export const getBlogs = async (
     if (limit < 1) limit = 10;
     if (limit > 100) limit = 100;
 
-    const version =
-      await getCacheVersion(
-        BlogCacheKeys.listVersion()
-      );
-
-    const cacheKey =
-      BlogCacheKeys.list(
-        version,
-        page,
-        limit
-      );
-
-    const cachedBlogs =
-      await getCache(cacheKey);
-
-    if (cachedBlogs) {
-      await logger.debug("Fetched blogs from cache", { context: "BlogController" });
-      return res.status(200).json({
-        blog: cachedBlogs,
-        'source': 'cache',
-      });
-    }
-
     const blogs =
       await blogModel
         .find({ isDeleted: false })
@@ -166,11 +138,6 @@ export const getBlogs = async (
           })
           : null,
       })),
-    );
-    await setCache(
-      cacheKey,
-      signedBlogs,
-      60 * 60
     );
 
     await logger.info(`Fetched ${signedBlogs.length} blogs from database`, { context: "BlogController" });
@@ -201,28 +168,6 @@ export const getBlogBySlug = async (
         id: string;
       };
 
-    const version =
-      await getCacheVersion(
-        BlogCacheKeys.detailsVersion(id)
-      );
-
-    const cacheKey =
-      BlogCacheKeys.details(
-        id,
-        version
-      );
-
-    const cachedBlog =
-      await getCache(cacheKey);
-
-    if (cachedBlog) {
-      await logger.debug(`Fetched blog details from cache for ID: ${id}`, { context: "BlogController" });
-      return res.status(200).json({
-        data: cachedBlog,
-        source: "cache",
-      });
-    }
-
     const blog =
       await blogModel
         .findOne({
@@ -243,12 +188,6 @@ export const getBlogBySlug = async (
         key: blog.image,
       });
     }
-
-    await setCache(
-      cacheKey,
-      blog,
-      60 * 60
-    );
 
     await logger.info(`Fetched blog details from database for ID: ${id}`, { context: "BlogController" });
 
@@ -417,13 +356,6 @@ export const deleteBlog = async (
       });
     }
 
-    await incrementCacheVersion(
-      BlogCacheKeys.listVersion()
-    );
-
-    await incrementCacheVersion(
-      BlogCacheKeys.detailsVersion(id)
-    );
 
     await sendInfoNotification(
       "Blog Deleted",

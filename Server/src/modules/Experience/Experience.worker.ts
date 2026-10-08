@@ -2,8 +2,6 @@ import { Worker } from "bullmq";
 import { bellmqConnection } from "@config/redis.ts";
 import { ExperienceModel } from "./Experience.model.ts";
 import {
-    incrementCacheVersion,
-    ExperienceCacheKeys,
     logger,
 } from "@utils";
 import type { IExperienceJob } from "./Experience.types.ts";
@@ -17,10 +15,6 @@ export const experienceWorker = new Worker<IExperienceJob>(
                 job.data.data
             );
 
-            await incrementCacheVersion(
-                ExperienceCacheKeys.listVersion()
-            );
-            
             await sendInfoNotification(
                 "Experience Creation",
                 `New experience created: ${experience.title}.`
@@ -51,15 +45,6 @@ export const experienceWorker = new Worker<IExperienceJob>(
             throw new Error("Experience not found");
         }
 
-        await incrementCacheVersion(
-            ExperienceCacheKeys.listVersion()
-        );
-
-        await incrementCacheVersion(
-            ExperienceCacheKeys.detailsVersion(
-                experienceId
-            )
-        );
 
         await sendInfoNotification(
             "Experience Update",
